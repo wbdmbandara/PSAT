@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Register | PSAT</title>
+    <title>Login | PSAT</title>
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <meta content="" name="keywords">
     <meta content="" name="description">
@@ -45,7 +45,7 @@
     <div class="container position-fixed translate-middle w-100 vh-100 top-50 start-50 d-flex align-items-center justify-content-center">
         <div class="authentication-wrapper authentication-basic container-p-y">
             <div class="authentication-inner">
-                <!-- Register Card -->
+                <!-- Login Card -->
                 <div class="card">
                     <div class="card-body">
                         <!-- Logo -->
@@ -58,7 +58,7 @@
                         </div>
                         <!-- /Logo -->
                         <h4 class="mb-2 text-center">Welcome to PSAT! 👋</h4>
-                        <p class="mb-4 text-center">Please sign-up to your account and start the adventure</p>
+                        <p class="mb-4 text-center">Please sign-in to your account and start the adventure</p>
 
                         {% with messages = get_flashed_messages(with_categories=true) %}
                             {% if messages %}
@@ -75,13 +75,13 @@
                                 {{ error }}
                             </div>
                         {% endif %}
-
-                        <form id="formAuthentication" class="mb-3" action="{{ url_for('admin.register') }}" method="POST">
-                            <div class="mb-3">
-                              <label class="form-label" for="name">Username</label>
-                              <input type="text" class="form-control" id="name" name="name" required />
+                        {% if success %}
+                            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                {{ success }}
                             </div>
-                          
+                        {% endif %}
+
+                        <form id="formAuthentication" class="mb-3" action="{{ url_for('admin.login') }}" method="POST">
                             <div class="mb-3">
                               <label class="form-label" for="email">Email</label>
                               <input type="email" class="form-control" id="email" name="email" required />
@@ -91,22 +91,22 @@
                               <label class="form-label" for="password">Password</label>
                               <input type="password" class="form-control" id="password" name="password" required />
                             </div>
-                          
-                            <button type="submit" class="btn btn-primary d-grid w-100">Sign Up</button>
+
+                            <button type="submit" class="btn btn-primary d-grid w-100">Sign In</button>
                         </form>
 
                         <p class="text-center">
-                            <span>Already have an account?</span>
-                            <a href="{{ url_for('admin.login') }}">
-                                <span>Sign in instead</span>
+                            <span>Don't have an account?</span>
+                            <a href="{{ url_for('admin.register') }}">
+                                <span>Sign up instead</span>
                             </a>
                         </p>
                     </div>
                 </div>
-                <!-- /Register Card -->
+                <!-- /Login Card -->
             </div>
         </div>
     </div>
-    <!-- Sign Up End -->
+    <!-- Sign In End -->
 </body>
 </html>
