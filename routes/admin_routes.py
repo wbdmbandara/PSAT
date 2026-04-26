@@ -71,3 +71,14 @@ def login():
             return render_template("login.html", error="Invalid email or password")
 
     return render_template("login.html")
+
+@admin_bp.route("/dashboard", methods=["GET"])
+def dashboard():
+    # check if user is logged in
+    if "user_id" not in session:
+        return redirect(url_for("admin.login"))
+    data = {
+        "user_name": session["user_name"],
+        "current_year": datetime.now().year,
+    }
+    return render_template("dashboard.html", data=data)
