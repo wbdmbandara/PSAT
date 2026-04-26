@@ -82,3 +82,8 @@ def dashboard():
         "current_year": datetime.now().year,
     }
     return render_template("dashboard.html", data=data)
+
+@admin_bp.route("/logout", methods=["GET"])
+def logout():
+    session.clear()
+    return redirect(url_for("admin.login"))
