@@ -87,3 +87,49 @@ def dashboard():
 def logout():
     session.clear()
     return redirect(url_for("admin.login"))
+
+@admin_bp.route("/email-list", methods=["GET"])
+def email_list():
+    # check if user is logged in
+    if "user_id" not in session:
+        return redirect(url_for("admin.login"))
+
+    try:
+        # fetch email list from database users table
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE created_by = %s", (session["user_id"],))
+        email_list = cursor.fetchall()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Database error: {e}")
+        email_list = []
+
+    data = {
+        "user_name": session["user_name"],
+        "current_year": datetime.now().year,
+        "email_list": email_list
+    }
+    return render_template("email_list.html", data=data)
+
+@admin_bp.route("/add-email", methods=["POST"])
+def add_email():
+    if "user_id" not in session:
+        return redirect(url_for("admin.login"))
+
+    email = request.form.get("email")
+    name = request.form.get("name")
+    created_at = datetime.now()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO users (email, name, created_at, created_by) VALUES (%s, %s, %s, %s)",
+        (email, name, created_at, session["user_id"])
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("admin.email_list"))
