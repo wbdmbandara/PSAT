@@ -18,5 +18,11 @@ def home():
 
 app.register_blueprint(admin_bp, url_prefix="/admin")
 
+@app.errorhandler(404)
+def page_not_found(e):
+    # Optional: pass the same kind of layout data your templates use
+    data = {"current_year": __import__("datetime").datetime.now().year}
+    return render_template("404.html", data=data), 404
+
 if __name__ == "__main__":
     app.run(debug=True)

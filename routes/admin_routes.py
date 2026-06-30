@@ -239,6 +239,78 @@ def delete_email(email_id):
 
     return redirect(url_for("admin.email_list"))
 
+# import csv file and add to database
+@admin_bp.route("/import-emails", methods=["GET", "POST"])
+def import_emails():
+    if "user_id" not in session:
+        return redirect(url_for("admin.login"))
+
+    if request.method == "POST":
+        file = request.files.get("csv_file")
+        # Check if a file was actually selected (browsers sometimes submit empty filenames)
+        if not file or file.filename == '':
+            return render_template("import_emails.html", data={
+                "user_name": session.get("user_name", ""),
+                "current_year": datetime.now().year
+            }, error="No file selected")
+
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # read csv file and insert into database
+            import csv
+            from io import StringIO
+
+            stream = StringIO(file.stream.read().decode("utf-8-sig", errors="replace"), newline=None)
+            csv_input = csv.reader(stream)
+
+            header_skipped = False
+
+            for row_num, row in enumerate(csv_input, start=1):
+                if len(row) != 2:
+                    continue 
+                email, name = row
+
+                email = email.strip()
+                name = name.strip()
+                
+                if not header_skipped and email.lower() == 'email':
+                    header_skipped = True
+                    continue
+                    
+                if len(email) > 255:
+                    raise ValueError(f"Email at row {row_num} exceeds 255 characters.")
+
+                created_at = datetime.now()
+                cursor.execute(
+                    "INSERT INTO users (email, name, created_at, created_by) VALUES (%s, %s, %s, %s)",
+                    (email, name, created_at, session.get("user_id"))
+                )
+
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            error_msg = f"Failed to import emails: {e}"
+            return render_template("email_list.html", data={
+                "user_name": session.get("user_name", ""),
+                "current_year": datetime.now().year,
+                "email_list": []
+            }, error=error_msg)
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+        return redirect(url_for("admin.email_list"))
+
+    return render_template("import_emails.html", data={
+        "user_name": session.get("user_name", ""),
+        "current_year": datetime.now().year
+    })
+
+
 @admin_bp.route("/send-test-email", methods=["GET"])
 def send_test_email():
 

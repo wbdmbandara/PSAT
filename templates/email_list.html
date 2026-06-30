@@ -10,9 +10,21 @@
         <h6 class="mb-0">Email List</h6>
         <div>
             <a href="#" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#newEmailModal">New Email</a>
-            <a href="#" class="btn btn-secondary">Import CSV</a>
+            <a href="{{ url_for('admin.import_emails') }}" class="btn btn-secondary">Import CSV</a>
         </div>
     </div>
+    <!-- Message alert -->
+    {% if error %}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ error }}
+        </div>
+    {% endif %}
+    {% if success %}
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ success }}
+        </div>
+    {% endif %}
+    <!-- Message alert -->
     <div class="table-responsive">
         <table class="table table-bordered">
             <thead>
