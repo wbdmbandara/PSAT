@@ -13,7 +13,7 @@
     
     
     // Initiate the wowjs
-    new WOW().init();
+    // new WOW().init();
 
 
     // Sticky Navbar
@@ -58,10 +58,10 @@
 
 
     // Facts counter
-    $('[data-toggle="counter-up"]').counterUp({
-        delay: 10,
-        time: 2000
-    });
+    // $('[data-toggle="counter-up"]').counterUp({
+    //     delay: 10,
+    //     time: 2000
+    // });
 
     // Sidebar Toggler
     $('.sidebar-toggler').click(function () {
@@ -165,6 +165,7 @@
 
 
     // Single Line Chart
+    /*
     var ctx3 = $("#line-chart").get(0).getContext("2d");
     var myChart3 = new Chart(ctx3, {
         type: "line",
@@ -181,9 +182,10 @@
             responsive: true
         }
     });
-
+    */
 
     // Single Bar Chart
+    /*
     var ctx4 = $("#bar-chart").get(0).getContext("2d");
     var myChart4 = new Chart(ctx4, {
         type: "bar",
@@ -204,9 +206,10 @@
             responsive: true
         }
     });
-
+    */
 
     // Pie Chart
+    /*
     var ctx5 = $("#pie-chart").get(0).getContext("2d");
     var myChart5 = new Chart(ctx5, {
         type: "pie",
@@ -227,9 +230,10 @@
             responsive: true
         }
     });
-
+    */
 
     // Doughnut Chart
+    /*
     var ctx6 = $("#doughnut-chart").get(0).getContext("2d");
     var myChart6 = new Chart(ctx6, {
         type: "doughnut",
@@ -250,7 +254,7 @@
             responsive: true
         }
     });
-
+    */
     
 })(jQuery);
 
