@@ -212,6 +212,33 @@ def edit_email(email_id):
             "email_data": None
         }, error=error_msg)
 
+@admin_bp.route("/delete-email/<int:email_id>", methods=["POST"])
+def delete_email(email_id):
+    if "user_id" not in session:
+        return redirect(url_for("admin.login"))
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM users WHERE id = %s AND created_by = %s",
+            (email_id, session["user_id"])
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        error_msg = f"Failed to delete email: {e}"
+        return render_template("email_list.html", data={
+            "user_name": session.get("user_name", ""),
+            "current_year": datetime.now().year,
+            "email_list": []
+        }, error=error_msg)
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for("admin.email_list"))
+
 @admin_bp.route("/send-test-email", methods=["GET"])
 def send_test_email():
 
