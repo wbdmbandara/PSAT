@@ -4,6 +4,7 @@ from werkzeug.security import check_password_hash
 from flask import session
 from datetime import datetime
 from database.db import get_connection
+from emails.email_service import send_email
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -210,3 +211,15 @@ def edit_email(email_id):
             "current_year": datetime.now().year,
             "email_data": None
         }, error=error_msg)
+
+@admin_bp.route("/send-test-email", methods=["GET"])
+def send_test_email():
+
+    send_email(
+        to="dilshanmadusanka20160@gmail.com",
+        subject="PSAT Test Email",
+        template="emails/test_email.html",
+        name="Dilshan"
+    )
+
+    return "Email Sent Successfully!"
