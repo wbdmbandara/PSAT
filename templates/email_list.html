@@ -10,7 +10,7 @@
         <h6 class="mb-0">Email List</h6>
         <div>
             <a href="#" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#newEmailModal">New Email</a>
-            <a href="{{ url_for('admin.import_emails') }}" class="btn btn-secondary">Import CSV</a>
+            <a href="#" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#importEmailModal">Import CSV</a>
         </div>
     </div>
     <!-- Message alert -->
@@ -25,6 +25,14 @@
         </div>
     {% endif %}
     <!-- Message alert -->
+    {% if session.get("import_summary") %}
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <strong>Imported Email Summary:</strong>
+                Inserted: {{ session["import_summary"].inserted }} ,
+                Duplicates: {{ session["import_summary"].duplicates }} ,
+                Errors: {{ session["import_summary"].errors }}
+        </div>
+    {% endif %}
     <div class="table-responsive">
         <table class="table table-bordered">
             <thead>
@@ -143,6 +151,33 @@
 </div>
 <!-- Delete Email Modal End -->
 
+<!-- Import Email Modal Start -->
+<div class="modal fade" id="importEmailModal" tabindex="-1" aria-labelledby="importEmailModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importEmailModalLabel">Import Emails from CSV</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin.import_emails') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="csvFile" class="form-label">Select CSV File</label>
+                        <input type="file" class="form-control" id="csvFile" name="csv_file" accept=".csv" required>
+                    </div>
+                    <p class="text-muted">The CSV file should have two columns: "Email" and "Name".</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary float-start" onclick="downloadSampleCSV()">Download Sample CSV</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- Import Email Modal End -->
+
 <script>
     function setEmailData(emailId, email, name) {
         document.getElementById('editEmail').value = email;
@@ -158,6 +193,11 @@
         // Build the delete form action URL
         const url = "{{ url_for('admin.delete_email', email_id=0) }}".replace('0', parseInt(emailId));
         document.getElementById('deleteEmailForm').action = url;
+    }
+
+    function downloadSampleCSV() {
+        const url = "{{ url_for('admin.download_sample_csv') }}";
+        window.location.href = url;
     }
 </script>
 

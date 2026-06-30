@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, make_response
 from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
 from flask import session
@@ -266,6 +266,9 @@ def import_emails():
             csv_input = csv.reader(stream)
 
             header_skipped = False
+            inserted_count = 0
+            duplicate_count = 0
+            errors_count = 0
 
             for row_num, row in enumerate(csv_input, start=1):
                 if len(row) != 2:
@@ -280,13 +283,20 @@ def import_emails():
                     continue
                     
                 if len(email) > 255:
-                    raise ValueError(f"Email at row {row_num} exceeds 255 characters.")
+                    errors_count += 1
+                    continue
 
                 created_at = datetime.now()
+
+                if email_exists(email):
+                    duplicate_count += 1
+                    continue
+
                 cursor.execute(
                     "INSERT INTO users (email, name, created_at, created_by) VALUES (%s, %s, %s, %s)",
                     (email, name, created_at, session.get("user_id"))
                 )
+                inserted_count += 1
 
             conn.commit()
         except Exception as e:
@@ -303,6 +313,11 @@ def import_emails():
             if conn:
                 conn.close()
 
+        session["import_summary"] = {
+            "inserted": inserted_count,
+            "duplicates": duplicate_count,
+            "errors": errors_count
+        }
         return redirect(url_for("admin.email_list"))
 
     return render_template("import_emails.html", data={
@@ -310,6 +325,28 @@ def import_emails():
         "current_year": datetime.now().year
     })
 
+# check email exists in the database
+def email_exists(email):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+        user = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return user is not None
+    except Exception as e:
+        print(f"An error occurred while checking email existence: {e}")
+        return False
+
+# Download Sample CSV
+@admin_bp.route("/download-sample-csv", methods=["GET"])
+def download_sample_csv():
+    sample_csv = "email,name\nexample@example.com,Example User"
+    response = make_response(sample_csv)
+    response.headers["Content-Disposition"] = "attachment; filename=sample.csv"
+    response.headers["Content-Type"] = "text/csv"
+    return response
 
 @admin_bp.route("/send-test-email", methods=["GET"])
 def send_test_email():
