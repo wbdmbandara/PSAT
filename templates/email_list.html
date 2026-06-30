@@ -20,6 +20,7 @@
                     <th>Email</th>
                     <th>Name</th>
                     <th>Created At</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -29,11 +30,16 @@
                             <td>{{ email[1] }}</td>  <!-- Name -->
                             <td>{{ email[2] }}</td>  <!-- Email -->
                             <td>{{ email[3] }}</td>  <!-- Created At -->
+                            <td class="text-center">
+                                <a href="#" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editEmailModal" 
+                                   onclick="setEmailData('{{ email[0] }}', '{{ email[1] }}', '{{ email[2] }}')"><i class="bi bi-pencil"></i> Edit</a>
+                                <a href="#" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Delete</a>
+                            </td>
                         </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="3" class="text-center">No emails found.</td>
+                        <td colspan="4" class="text-center">No emails found.</td>
                     </tr>
                 {% endif %}
             </tbody>
@@ -70,5 +76,44 @@
     </div>
 </div>
 <!-- New Email Modal End-->
+
+<!-- Edit Email Modal Start -->
+<div class="modal fade" id="editEmailModal" tabindex="-1" aria-labelledby="editEmailModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editEmailModalLabel">Edit Email</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" id="editEmailForm" action="#">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editEmail" class="form-label">Email address</label>
+                        <input type="email" class="form-control" id="editEmail" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editName" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="editName" name="name">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Update Email</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- Edit Email Modal End-->
+
+<script>
+    function setEmailData(emailId, email, name) {
+        document.getElementById('editEmail').value = email;
+        document.getElementById('editName').value = name;
+        // Convert emailId to integer and build the URL properly
+        const url = "{{ url_for('admin.edit_email', email_id=0) }}".replace('0', parseInt(emailId));
+        document.getElementById('editEmailForm').action = url;
+    }
+</script>
 
 {% endblock %}

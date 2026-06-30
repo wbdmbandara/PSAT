@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Email | PSAT{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-4 px-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="mb-0">Edit Email</h6>
+    <a href="{{ url_for('admin.email_list') }}" class="btn btn-secondary btn-sm">Back</a>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {#
+    `data.email_data` is returned as a DB row tuple for GET requests.
+    In the POST error path it may be a dict: {id, email, name}.
+    Support both so the page works in all cases.
+  #}
+  {% set is_row = data and data.email_data and (data.email_data is sequence) and (data.email_data is not mapping) %}
+
+  {% if data and data.email_data %}
+    <div class="card">
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.edit_email', email_id=(data.email_data[0] if is_row else data.email_data.id)) }}">
+          <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <input
+              type="email"
+              class="form-control"
+              id="email"
+              name="email"
+              required
+              value="{{ (data.email_data[1] if is_row else data.email_data.email) }}"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="name" class="form-label">Name</label>
+            <input
+              type="text"
+              class="form-control"
+              id="name"
+              name="name"
+              value="{{ (data.email_data[2] if is_row else data.email_data.name) }}"
+            />
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="{{ url_for('admin.email_list') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-warning" role="alert">No email record found.</div>
+    <a href="{{ url_for('admin.email_list') }}" class="btn btn-secondary">Back to list</a>
+  {% endif %}
+</div>
+{% endblock %}
