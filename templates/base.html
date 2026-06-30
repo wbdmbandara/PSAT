@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include "partials/head.html" %}
+    <title>{% block title %}PSAT{% endblock %}</title>
+</head>
+
+<body>
+    <div class="container-fluid position-relative bg-white d-flex p-0">
+
+        <!-- Spinner Start -->
+        {% include "partials/spinner.html" %}
+        <!-- Spinner End -->
+
+        <!-- Sidebar Start -->
+        {% include "partials/sidebar.html" %}
+        <!-- Sidebar End -->
+
+        <!-- Content Start -->
+        <div class="content">
+
+            <!-- Navbar Start -->
+            {% include "partials/top_navbar.html" %}
+            <!-- Navbar End -->
+
+            <!-- Main Page Content -->
+            {% block content %}
+            {% endblock %}
+
+            <!-- Footer Start -->
+            {% include "partials/footer.html" %}
+            <!-- Footer End -->
+
+        </div>
+        <!-- Content End -->
+
+        <!-- Back to Top -->
+        <a href="#" class="btn btn-lg btn-primary btn-lg-square back-to-top">
+            <i class="bi bi-arrow-up"></i>
+        </a>
+
+    </div>
+
+    {% include "partials/scripts.html" %}
+</body>
+
+</html>

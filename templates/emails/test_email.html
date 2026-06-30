@@ -1,0 +1,18 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h3 style="margin-top:0; color:#212529;">Test Email ✅</h3>
+
+<p style="color:#495057; font-size:14px; line-height:1.6;">
+    Hello {{ name }},
+</p>
+
+<p style="color:#495057; font-size:14px; line-height:1.6;">
+    This is a test email sent from the PSAT Flask project.
+</p>
+
+<p style="color:#6c757d; font-size:13px;">
+    Regards,<br>
+    PSAT Team
+</p>
+{% endblock %}

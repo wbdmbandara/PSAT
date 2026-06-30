@@ -19,6 +19,9 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE users ADD COLUMN created_by INT NULL;
+ALTER TABLE users ADD FOREIGN KEY (created_by) REFERENCES admins(id);
+
 CREATE TABLE campaigns (
     id INT AUTO_INCREMENT PRIMARY KEY,
     campaign_name VARCHAR(150) NOT NULL,
