@@ -1,26 +1,30 @@
-from flask import Flask, render_template, redirect, url_for, flash, request
+from flask import Flask, render_template
 from routes.admin_routes import admin_bp
+from routes.track_routes import track_bp
 from config import Config
 from extensions import mail
 import os
 
 app = Flask(__name__)
-app.config.from_object(Config)
 
-# initialize mail
+# 1. Load configuration and set secret key
+app.config.from_object(Config)
+app.config["SECRET_KEY"] = os.urandom(24)
+
+# 2. Initialize extensions
 mail.init_app(app)
 
-app.config["SECRET_KEY"] = os.urandom(24)
+# 3. Register Blueprints (Cleanly registered once)
+app.register_blueprint(admin_bp, url_prefix="/admin")
+app.register_blueprint(track_bp)
 
 @app.route("/")
 def home():
     return "PSAT System is running!"
 
-app.register_blueprint(admin_bp, url_prefix="/admin")
-
+# 4. Global Error Handlers
 @app.errorhandler(404)
 def page_not_found(e):
-    # Optional: pass the same kind of layout data your templates use
     data = {"current_year": __import__("datetime").datetime.now().year}
     return render_template("404.html", data=data), 404
 
