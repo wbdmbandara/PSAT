@@ -1,11 +1,13 @@
-from flask import Blueprint, render_template, request, redirect, url_for, make_response
-from werkzeug.security import generate_password_hash
-from werkzeug.security import check_password_hash
-from flask import session
+import uuid
+import csv
+from io import StringIO
 from datetime import datetime
+from flask import Blueprint, render_template, request, redirect, url_for, make_response, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
 from database.db import get_connection
-from emails.email_service import send_email
+from emails.email_service import send_email, send_simulation_email
 
+# 1. THIS DEFINITION MUST COME BEFORE ANY ROUTES
 admin_bp = Blueprint('admin', __name__)
 
 @admin_bp.route("/register", methods=["GET", "POST"])
@@ -85,7 +87,6 @@ def login():
 
 @admin_bp.route("/dashboard", methods=["GET"])
 def dashboard():
-    # check if user is logged in
     if "user_id" not in session:
         return redirect(url_for("admin.login"))
     data = {
@@ -101,22 +102,20 @@ def logout():
 
 @admin_bp.route("/email-list", methods=["GET"])
 def email_list():
-    # check if user is logged in
     if "user_id" not in session:
         return redirect(url_for("admin.login"))
 
     try:
-        # fetch email list from database users table
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE created_by = %s", (session["user_id"],))
-        email_list = cursor.fetchall()
+        list_data = cursor.fetchall()
         cursor.close()
         conn.close()
         data = {
             "user_name": session["user_name"],
             "current_year": datetime.now().year,
-            "email_list": email_list
+            "email_list": list_data
         }
         return render_template("email_list.html", data=data)
     except Exception as e:
@@ -239,7 +238,6 @@ def delete_email(email_id):
 
     return redirect(url_for("admin.email_list"))
 
-# import csv file and add to database
 @admin_bp.route("/import-emails", methods=["GET", "POST"])
 def import_emails():
     if "user_id" not in session:
@@ -247,7 +245,6 @@ def import_emails():
 
     if request.method == "POST":
         file = request.files.get("csv_file")
-        # Check if a file was actually selected (browsers sometimes submit empty filenames)
         if not file or file.filename == '':
             return render_template("import_emails.html", data={
                 "user_name": session.get("user_name", ""),
@@ -258,10 +255,6 @@ def import_emails():
             conn = get_connection()
             cursor = conn.cursor()
 
-            # read csv file and insert into database
-            import csv
-            from io import StringIO
-
             stream = StringIO(file.stream.read().decode("utf-8-sig", errors="replace"), newline=None)
             csv_input = csv.reader(stream)
 
@@ -270,7 +263,7 @@ def import_emails():
             duplicate_count = 0
             errors_count = 0
 
-            for row_num, row in enumerate(csv_input, start=1):
+            for row in csv_input:
                 if len(row) != 2:
                     continue 
                 email, name = row
@@ -325,7 +318,6 @@ def import_emails():
         "current_year": datetime.now().year
     })
 
-# check email exists in the database
 def email_exists(email):
     try:
         conn = get_connection()
@@ -339,7 +331,6 @@ def email_exists(email):
         print(f"An error occurred while checking email existence: {e}")
         return False
 
-# Download Sample CSV
 @admin_bp.route("/download-sample-csv", methods=["GET"])
 def download_sample_csv():
     sample_csv = "email,name\nexample@example.com,Example User"
@@ -350,12 +341,72 @@ def download_sample_csv():
 
 @admin_bp.route("/send-test-email", methods=["GET"])
 def send_test_email():
-
     send_email(
         to="dilshanmadusanka20160@gmail.com",
         subject="PSAT Test Email",
         template="emails/test_email.html",
         name="Dilshan"
     )
-
     return "Email Sent Successfully!"
+
+# 2. THIS NEW DISPATCH TRIGGER ROUTE SITS COMFORTABLY AT THE BOTTOM
+@admin_bp.route('/send-simulation/<int:email_id>', methods=['POST'])
+def trigger_simulation(email_id):
+    """
+    Fetches the selected email, records the dispatch in the email_logs table,
+    and sends the simulation email using the user's database ID as the identifier.
+    """
+    if "user_id" not in session:
+        return redirect(url_for("admin.login"))
+
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT email FROM users WHERE id = %s", (email_id,))
+        target = cursor.fetchone()
+        
+        if not target:
+            flash("Target user not found.", "danger")
+            cursor.close()
+            conn.close()
+            return redirect(url_for('admin.email_list'))
+            
+        target_email = target[0]
+
+        cursor.execute("SELECT id FROM campaigns LIMIT 1")
+        campaign = cursor.fetchone()
+        
+        if campaign:
+            campaign_id = campaign[0]
+        else:
+            cursor.execute(
+                "INSERT INTO campaigns (campaign_name, description) VALUES (%s, %s)",
+                ("Default Awareness Campaign", "Automated tracking campaign for baseline testing")
+            )
+            conn.commit()
+            campaign_id = cursor.lastrowid
+
+        query = """
+            INSERT INTO email_logs (campaign_id, user_id, sent_time, status) 
+            VALUES (%s, %s, NOW(), 'Sent')
+        """
+        cursor.execute(query, (campaign_id, email_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        success = send_simulation_email(target_email, email_id)
+        
+        if success:
+            flash(f"Simulation template safely dispatched to {target_email}!", "success")
+        else:
+            flash("Database log recorded, but SMTP server failed to deliver email.", "warning")
+
+    except Exception as e:
+        print(f"Database tracking compilation failed: {str(e)}")
+        flash("Internal tracker registration logic failure.", "danger")
+        if conn:
+            conn.close()
+
+    return redirect(url_for('admin.email_list'))
