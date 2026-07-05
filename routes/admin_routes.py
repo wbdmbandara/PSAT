@@ -475,3 +475,66 @@ def trigger_simulation(email_id):
             conn.close()
 
     return redirect(url_for('admin.email_list'))
+
+@admin_bp.route("/report/<report_type>", methods=["GET"])
+def view_report(report_type):
+    if "user_id" not in session:
+        return redirect(url_for("admin.login"))
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    title = ""
+    headers = []
+    rows = []
+    
+    try:
+        if report_type == "emails":
+            title = "Email Dispatch Report"
+            headers = ["Name", "Email Address", "Sent Time", "Status"]
+            cursor.execute("""
+                SELECT u.name, u.email, el.sent_time, el.status 
+                FROM email_logs el 
+                JOIN users u ON el.user_id = u.id 
+                ORDER BY el.sent_time DESC
+            """)
+            rows = cursor.fetchall()
+            
+        elif report_type == "clicks":
+            title = "Overall Click Rate Report"
+            headers = ["Name", "Email Address", "Click Time", "IP Address"]
+            cursor.execute("""
+                SELECT u.name, u.email, cl.click_time, cl.ip_address 
+                FROM click_logs cl 
+                JOIN users u ON cl.user_id = u.id 
+                ORDER BY cl.click_time DESC
+            """)
+            rows = cursor.fetchall()
+            
+        elif report_type == "logins":
+            title = "Compromise (Login Attempts) Report"
+            headers = ["Name", "Email Address", "Attempt Time", "IP Address"]
+            cursor.execute("""
+                SELECT u.name, u.email, la.attempt_time, la.ip_address 
+                FROM login_attempts la 
+                JOIN users u ON la.user_id = u.id 
+                ORDER BY la.attempt_time DESC
+            """)
+            rows = cursor.fetchall()
+        else:
+            return redirect(url_for("admin.dashboard"))
+            
+    except Exception as e:
+        print(f"Error fetching report: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    
+    data = {
+        "user_name": session.get("user_name", "Admin"),
+        "current_year": datetime.now().year,
+        "title": title,
+        "headers": headers,
+        "rows": rows
+    }
+    return render_template("report.html", data=data)
