@@ -520,7 +520,18 @@ def view_report(report_type):
                 JOIN users u ON la.user_id = u.id 
                 ORDER BY la.attempt_time DESC
             """)
+            rows = cursor.fetchall()      
+            
+        elif report_type == "campaigns":
+            title = "Campaign Overview Report"
+            headers = ["Campaign ID", "Campaign Name", "Status", "Template Used"]
+            cursor.execute("""
+                SELECT id, campaign_name, status, template_name 
+                FROM campaigns 
+                ORDER BY id DESC
+            """)
             rows = cursor.fetchall()
+            
         else:
             return redirect(url_for("admin.dashboard"))
             
@@ -538,3 +549,59 @@ def view_report(report_type):
         "rows": rows
     }
     return render_template("report.html", data=data)
+
+@admin_bp.route("/create-campaign", methods=["GET", "POST"])
+def create_campaign():
+    if "user_id" not in session:
+        return redirect(url_for("admin.login"))
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+        name = request.form.get("campaign_name")
+        desc = request.form.get("description")
+        template = request.form.get("template_name")
+        target_ids = request.form.getlist("target_users") # Gets list of checked user IDs
+
+        try:
+            # 1. Create the campaign
+            cursor.execute(
+                "INSERT INTO campaigns (campaign_name, description, status, template_name) VALUES (%s, %s, %s, %s)",
+                (name, desc, 'Draft', template)
+            )
+            campaign_id = cursor.lastrowid
+
+            # 2. Link targets by creating 'Pending' email logs
+            for uid in target_ids:
+                cursor.execute(
+                    "INSERT INTO email_logs (campaign_id, user_id, status) VALUES (%s, %s, 'Pending')",
+                    (campaign_id, uid)
+                )
+            
+            conn.commit()
+            # Note: For now we redirect to dashboard. Later this will go to a 'Campaign List' page.
+            return redirect(url_for("admin.dashboard")) 
+        except Exception as e:
+            conn.rollback()
+            print(f"Error creating campaign: {e}")
+            # Fall through to re-render the form with an error (you can add flash messages later)
+        
+    # GET request: Fetch users for the target checklist
+    try:
+        cursor.execute("SELECT id, name, email FROM users WHERE created_by = %s", (session["user_id"],))
+        users_list = cursor.fetchall()
+    except Exception as e:
+        print(f"Error fetching users: {e}")
+        users_list = []
+    finally:
+        cursor.close()
+        conn.close()
+
+    data = {
+        "user_name": session.get("user_name", "Admin"),
+        "current_year": datetime.now().year,
+        "users": users_list
+    }
+    return render_template("create_campaign.html", data=data)
+
