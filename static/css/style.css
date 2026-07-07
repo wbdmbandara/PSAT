@@ -275,3 +275,78 @@
     background: var(--dark);
     border-color: var(--primary);
 }
+
+
+
+
+/* static/css/style.css - Additions for Modern Dashboard  */
+
+body {
+    background-color: #f7f9fc; /* Soft, light background */
+}
+
+.saas-card {
+    background: #ffffff;
+    border: none !important;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(149, 157, 165, 0.1);
+    transition: transform 0.2s ease-in-out;
+}
+
+.saas-card:hover {
+    transform: translateY(-2px);
+}
+
+.icon-box-primary {
+    background-color: rgba(13, 110, 253, 0.1);
+    color: #0d6efd;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.icon-box-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-box-danger {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.activity-feed-item {
+    border-left: 2px solid #e9ecef;
+    padding-left: 15px;
+    position: relative;
+    margin-bottom: 15px;
+}
+.activity-feed-item::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #0d6efd;
+}
+.activity-feed-item.danger::before {
+    background-color: #dc3545;
+}

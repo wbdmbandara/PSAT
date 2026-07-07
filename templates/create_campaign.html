@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="text-dark font-weight-bold">Create New Campaign</h3>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+
+    <form method="POST" action="{{ url_for('admin.create_campaign') }}">
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card saas-card p-4 h-100">
+                    <h5 class="mb-4">Campaign Configuration</h5>
+                    
+                    <div class="mb-3">
+                        <label for="campaign_name" class="form-label fw-bold">Campaign Name</label>
+                        <input type="text" class="form-control" id="campaign_name" name="campaign_name" placeholder="name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label fw-bold">Description / Objective</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Briefly describe the goal of this simulation..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="template_name" class="form-label fw-bold">Select Email Template</label>
+                        <select class="form-select" id="template_name" name="template_name" required>
+                            <option value="emails/test_email.html">Standard Test Email</option>
+                            <option value="emails/base_email.html">Base Layout Template</option>
+                            </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card saas-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Select Targets</h5>
+                        <span class="badge bg-primary rounded-pill">{{ data.users|length }} Available</span>
+                    </div>
+                    
+                    <div class="alert alert-info py-2" role="alert">
+                        <small><i class="fa fa-info-circle me-1"></i> Select the users you want to include in this simulation.</small>
+                    </div>
+
+                    <div class="target-list border rounded p-3" style="max-height: 250px; overflow-y: auto;">
+                        {% for user in data.users %}
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="target_users" value="{{ user[0] }}" id="user_{{ user[0] }}">
+                            <label class="form-check-label w-100" style="cursor: pointer;" for="user_{{ user[0] }}">
+                                <strong>{{ user[1] }}</strong> <br>
+                                <small class="text-muted">{{ user[2] }}</small>
+                            </label>
+                        </div>
+                        {% else %}
+                        <p class="text-muted mb-0">No targets found. <a href="{{ url_for('admin.email_list') }}">Add users first</a>.</p>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary w-100 py-2 shadow-sm">
+                            <i class="fa fa-save me-2"></i> Save Campaign as Draft
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

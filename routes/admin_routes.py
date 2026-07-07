@@ -89,10 +89,75 @@ def login():
 def dashboard():
     if "user_id" not in session:
         return redirect(url_for("admin.login"))
-    data = {
-        "user_name": session["user_name"],
-        "current_year": datetime.now().year,
-    }
+        
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # 1. Total Emails Sent
+        cursor.execute("SELECT COUNT(*) FROM email_logs")
+        total_emails = cursor.fetchone()[0] or 0
+
+        # 2. Total Clicks
+        cursor.execute("SELECT COUNT(*) FROM click_logs")
+        total_clicks = cursor.fetchone()[0] or 0
+
+        # 3. Total Compromises (Credential Submissions)
+        cursor.execute("SELECT COUNT(*) FROM login_attempts")
+        total_compromises = cursor.fetchone()[0] or 0
+
+        # 4. Active Campaigns
+        cursor.execute("SELECT COUNT(*) FROM campaigns")
+        active_campaigns = cursor.fetchone()[0] or 0
+
+        # 5. Calculate Rates (Avoid division by zero)
+        click_rate = round((total_clicks / total_emails * 100), 1) if total_emails > 0 else 0.0
+        compromise_rate = round((total_compromises / total_emails * 100), 1) if total_emails > 0 else 0.0
+
+        # 6. Fetch Recent Activity (Combine tables, sort by most recent)
+        recent_activity_query = """
+            SELECT 'Simulation Dispatched' as type, sent_time as time, user_id FROM email_logs
+            UNION ALL
+            SELECT 'Link Clicked' as type, click_time as time, user_id FROM click_logs
+            UNION ALL
+            SELECT 'Credential Submitted' as type, attempt_time as time, user_id FROM login_attempts
+            ORDER BY time DESC LIMIT 4
+        """
+        cursor.execute(recent_activity_query)
+        recent_activities = cursor.fetchall()
+        
+        # 7. Basic Chart Data setup (using the current stats as the latest data point)
+        current_month = datetime.now().strftime("%b")
+
+        data = {
+            "user_name": session.get("user_name", "Admin"),
+            "current_year": datetime.now().year,
+            "total_emails": total_emails,
+            "click_rate": click_rate,
+            "compromise_rate": compromise_rate,
+            "active_campaigns": active_campaigns,
+            "recent_activities": recent_activities,
+            # Chart datasets (Dummy historical data + real current data)
+            "chart_labels": ['Jan', 'Feb', 'Mar', 'Apr', 'May', current_month],
+            "chart_clicks": [0, 0, 0, 0, 0, click_rate], 
+            "chart_comps": [0, 0, 0, 0, 0, compromise_rate]
+        }
+
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+        print(f"Dashboard Database Error: {e}")
+        # Fallback empty data to prevent the app from crashing if DB fails
+        data = {
+            "user_name": session.get("user_name", "Admin"),
+            "current_year": datetime.now().year,
+            "total_emails": 0, "click_rate": 0.0, "compromise_rate": 0.0, "active_campaigns": 0,
+            "recent_activities": [],
+            "chart_labels": ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            "chart_clicks": [0,0,0,0,0,0], "chart_comps": [0,0,0,0,0,0]
+        }
+
     return render_template("dashboard.html", data=data)
 
 @admin_bp.route("/logout", methods=["GET"])
@@ -410,3 +475,133 @@ def trigger_simulation(email_id):
             conn.close()
 
     return redirect(url_for('admin.email_list'))
+
+@admin_bp.route("/report/<report_type>", methods=["GET"])
+def view_report(report_type):
+    if "user_id" not in session:
+        return redirect(url_for("admin.login"))
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    title = ""
+    headers = []
+    rows = []
+    
+    try:
+        if report_type == "emails":
+            title = "Email Dispatch Report"
+            headers = ["Name", "Email Address", "Sent Time", "Status"]
+            cursor.execute("""
+                SELECT u.name, u.email, el.sent_time, el.status 
+                FROM email_logs el 
+                JOIN users u ON el.user_id = u.id 
+                ORDER BY el.sent_time DESC
+            """)
+            rows = cursor.fetchall()
+            
+        elif report_type == "clicks":
+            title = "Overall Click Rate Report"
+            headers = ["Name", "Email Address", "Click Time", "IP Address"]
+            cursor.execute("""
+                SELECT u.name, u.email, cl.click_time, cl.ip_address 
+                FROM click_logs cl 
+                JOIN users u ON cl.user_id = u.id 
+                ORDER BY cl.click_time DESC
+            """)
+            rows = cursor.fetchall()
+            
+        elif report_type == "logins":
+            title = "Compromise (Login Attempts) Report"
+            headers = ["Name", "Email Address", "Attempt Time", "IP Address"]
+            cursor.execute("""
+                SELECT u.name, u.email, la.attempt_time, la.ip_address 
+                FROM login_attempts la 
+                JOIN users u ON la.user_id = u.id 
+                ORDER BY la.attempt_time DESC
+            """)
+            rows = cursor.fetchall()      
+            
+        elif report_type == "campaigns":
+            title = "Campaign Overview Report"
+            headers = ["Campaign ID", "Campaign Name", "Status", "Template Used"]
+            cursor.execute("""
+                SELECT id, campaign_name, status, template_name 
+                FROM campaigns 
+                ORDER BY id DESC
+            """)
+            rows = cursor.fetchall()
+            
+        else:
+            return redirect(url_for("admin.dashboard"))
+            
+    except Exception as e:
+        print(f"Error fetching report: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    
+    data = {
+        "user_name": session.get("user_name", "Admin"),
+        "current_year": datetime.now().year,
+        "title": title,
+        "headers": headers,
+        "rows": rows
+    }
+    return render_template("report.html", data=data)
+
+@admin_bp.route("/create-campaign", methods=["GET", "POST"])
+def create_campaign():
+    if "user_id" not in session:
+        return redirect(url_for("admin.login"))
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+        name = request.form.get("campaign_name")
+        desc = request.form.get("description")
+        template = request.form.get("template_name")
+        target_ids = request.form.getlist("target_users") # Gets list of checked user IDs
+
+        try:
+            # 1. Create the campaign
+            cursor.execute(
+                "INSERT INTO campaigns (campaign_name, description, status, template_name) VALUES (%s, %s, %s, %s)",
+                (name, desc, 'Draft', template)
+            )
+            campaign_id = cursor.lastrowid
+
+            # 2. Link targets by creating 'Pending' email logs
+            for uid in target_ids:
+                cursor.execute(
+                    "INSERT INTO email_logs (campaign_id, user_id, status) VALUES (%s, %s, 'Pending')",
+                    (campaign_id, uid)
+                )
+            
+            conn.commit()
+            # Note: For now we redirect to dashboard. Later this will go to a 'Campaign List' page.
+            return redirect(url_for("admin.dashboard")) 
+        except Exception as e:
+            conn.rollback()
+            print(f"Error creating campaign: {e}")
+            # Fall through to re-render the form with an error (you can add flash messages later)
+        
+    # GET request: Fetch users for the target checklist
+    try:
+        cursor.execute("SELECT id, name, email FROM users WHERE created_by = %s", (session["user_id"],))
+        users_list = cursor.fetchall()
+    except Exception as e:
+        print(f"Error fetching users: {e}")
+        users_list = []
+    finally:
+        cursor.close()
+        conn.close()
+
+    data = {
+        "user_name": session.get("user_name", "Admin"),
+        "current_year": datetime.now().year,
+        "users": users_list
+    }
+    return render_template("create_campaign.html", data=data)
+

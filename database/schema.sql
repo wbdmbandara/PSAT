@@ -29,6 +29,9 @@ CREATE TABLE campaigns (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE campaigns ADD COLUMN status VARCHAR(50) DEFAULT 'Draft';
+ALTER TABLE campaigns ADD COLUMN template_name VARCHAR(150) DEFAULT 'emails/test_email.html';
+
 CREATE TABLE email_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     campaign_id INT NOT NULL,
