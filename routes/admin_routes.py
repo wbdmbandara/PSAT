@@ -173,7 +173,12 @@ def email_list():
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE created_by = %s", (session["user_id"],))
+        search_query = request.args.get("search")
+        if search_query:
+            cursor.execute("SELECT * FROM users WHERE created_by = %s AND (email LIKE %s OR name LIKE %s)", (session["user_id"], f"%{search_query}%", f"%{search_query}%"))
+        else:
+            cursor.execute("SELECT * FROM users WHERE created_by = %s", (session["user_id"],))
+
         list_data = cursor.fetchall()
         cursor.close()
         conn.close()
