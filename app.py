@@ -4,6 +4,7 @@ from routes.track_routes import track_bp
 from config import Config
 from extensions import mail
 import os
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -20,12 +21,12 @@ app.register_blueprint(track_bp)
 
 @app.route("/")
 def home():
-    return "PSAT System is running!"
+    return render_template("home.html", current_year=datetime.now().year)
 
 # 4. Global Error Handlers
 @app.errorhandler(404)
 def page_not_found(e):
-    data = {"current_year": __import__("datetime").datetime.now().year}
+    data = {"current_year": datetime.now().year}
     return render_template("404.html", data=data), 404
 
 if __name__ == "__main__":
