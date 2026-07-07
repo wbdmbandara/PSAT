@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* CSS to format the page cleanly when the Print button is clicked */
+    @media print {
+        body * { visibility: hidden; }
+        #print-section, #print-section * { visibility: visible; }
+        #print-section { position: absolute; left: 0; top: 0; width: 100%; }
+        .no-print { display: none !important; }
+        .card { border: none !important; box-shadow: none !important; }
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="text-dark font-weight-bold">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-outline-secondary me-2 no-print">
+                <i class="fa fa-arrow-left"></i> Back
+            </a>
+            {{ data.title }}
+        </h3>
+        
+        <button onclick="window.print()" class="btn btn-primary shadow-sm no-print">
+            <i class="fa fa-print me-2"></i> Print Report
+        </button>
+    </div>
+
+    <div class="card saas-card p-4" id="print-section">
+        <h4 class="mb-4 d-none d-print-block">{{ data.title }}</h4> <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th width="5%">#</th>
+                        {% for header in data.headers %}
+                            <th>{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in data.rows %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        {% for cell in row %}
+                            <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No data available for this report.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
