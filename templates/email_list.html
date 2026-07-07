@@ -12,24 +12,15 @@
             <a href="#" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#importEmailModal">Import CSV</a>
         </div>
     </div>
-    {% if error %}
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            {{ error }}
-        </div>
-    {% endif %}
-    {% if success %}
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            {{ success }}
-        </div>
-    {% endif %}
-    {% if session.get("import_summary") %}
-        <div class="alert alert-info alert-dismissible fade show" role="alert">
-            <strong>Imported Email Summary:</strong>
-                Inserted: {{ session["import_summary"].inserted }} ,
-                Duplicates: {{ session["import_summary"].duplicates }} ,
-                Errors: {{ session["import_summary"].errors }}
-        </div>
-    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
     <div class="table-responsive">
         <table class="table table-bordered">
             <thead>

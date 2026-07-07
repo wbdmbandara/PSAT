@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, flash
 from routes.admin_routes import admin_bp
 from routes.track_routes import track_bp
 from config import Config

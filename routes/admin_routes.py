@@ -190,7 +190,8 @@ def email_list():
             "current_year": datetime.now().year,
             "email_list": []
         }
-        return render_template("email_list.html", data=data, error=error_msg)
+        flash(error_msg, "danger")
+        return render_template("email_list.html", data=data)
 
 @admin_bp.route("/add-email", methods=["POST"])
 def add_email():
@@ -200,6 +201,10 @@ def add_email():
     email = request.form.get("email")
     name = request.form.get("name")
     created_at = datetime.now()
+
+    if(email_exists(email)):
+        flash(f"Email {email} already exists.", "warning")
+        return redirect(url_for("admin.email_list"))
 
     try:
         conn = get_connection()
@@ -211,6 +216,7 @@ def add_email():
         conn.commit()
         cursor.close()
         conn.close()
+        flash(f"Email {email} added successfully.", "success")
         return redirect(url_for("admin.email_list"))
     except Exception as e:
         error_msg = f"Failed to add email: {e}"
@@ -219,7 +225,8 @@ def add_email():
             "current_year": datetime.now().year,
             "email_list": []
         }
-        return render_template("email_list.html", data=data, error=error_msg)
+        flash(error_msg, "danger")
+        return render_template("email_list.html", data=data)
 
 @admin_bp.route("/edit-email/<int:email_id>", methods=["GET", "POST"])
 def edit_email(email_id):
@@ -235,19 +242,27 @@ def edit_email(email_id):
             name = request.form.get("name")
 
             try:
+                # duplicate email check
+                cursor.execute("SELECT * FROM users WHERE email = %s AND id != %s AND created_by = %s", (email, email_id, session["user_id"]))
+                if cursor.fetchone():
+                    flash(f"Email {email} already exists.", "warning")
+                    return redirect(url_for("admin.email_list"))
+
                 cursor.execute(
                     "UPDATE users SET email = %s, name = %s WHERE id = %s AND created_by = %s",
                     (email, name, email_id, session["user_id"])
                 )
                 conn.commit()
+                flash(f"Email '{email}' updated successfully.", "success")
             except Exception as e:
                 conn.rollback()
                 error_msg = f"Failed to update email: {e}"
+                flash(error_msg, "danger")
                 return render_template("edit_email.html", data={
                     "user_name": session["user_name"],
                     "current_year": datetime.now().year,
                     "email_data": {"id": email_id, "email": email, "name": name}
-                }, error=error_msg)
+                })
             finally:
                 cursor.close()
                 conn.close()
@@ -270,11 +285,12 @@ def edit_email(email_id):
         return render_template("edit_email.html", data=data)
     except Exception as e:
         error_msg = f"An error occurred: {e}"
+        flash(error_msg, "danger")
         return render_template("edit_email.html", data={
             "user_name": session.get("user_name", ""),
             "current_year": datetime.now().year,
             "email_data": None
-        }, error=error_msg)
+        })
 
 @admin_bp.route("/delete-email/<int:email_id>", methods=["POST"])
 def delete_email(email_id):
@@ -284,19 +300,24 @@ def delete_email(email_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM users WHERE id = %s AND created_by = %s", (email_id, session["user_id"]))
+        email_data = cursor.fetchone()
+
         cursor.execute(
             "DELETE FROM users WHERE id = %s AND created_by = %s",
             (email_id, session["user_id"])
         )
         conn.commit()
+        flash(f"Email '{email_data[1]}' deleted successfully.", "success")
     except Exception as e:
         conn.rollback()
-        error_msg = f"Failed to delete email: {e}"
-        return render_template("email_list.html", data={
-            "user_name": session.get("user_name", ""),
-            "current_year": datetime.now().year,
-            "email_list": []
-        }, error=error_msg)
+        error_code = e.args[0] if len(e.args) > 0 else None
+        if error_code == 1451:
+            error_msg = "Cannot delete email because it is linked to other records (e.g., email logs)."
+        else:
+            error_msg = f"Failed to delete email: {e}"
+        flash(error_msg, "danger")
     finally:
         cursor.close()
         conn.close()
@@ -311,10 +332,11 @@ def import_emails():
     if request.method == "POST":
         file = request.files.get("csv_file")
         if not file or file.filename == '':
+            flash("No file selected for uploading.", "danger")
             return render_template("import_emails.html", data={
                 "user_name": session.get("user_name", ""),
                 "current_year": datetime.now().year
-            }, error="No file selected")
+            })
 
         try:
             conn = get_connection()
@@ -360,22 +382,19 @@ def import_emails():
         except Exception as e:
             conn.rollback()
             error_msg = f"Failed to import emails: {e}"
+            flash(error_msg, "danger")
             return render_template("email_list.html", data={
                 "user_name": session.get("user_name", ""),
                 "current_year": datetime.now().year,
                 "email_list": []
-            }, error=error_msg)
+            })
         finally:
             if cursor:
                 cursor.close()
             if conn:
                 conn.close()
 
-        session["import_summary"] = {
-            "inserted": inserted_count,
-            "duplicates": duplicate_count,
-            "errors": errors_count
-        }
+        flash(f"Import Summary: {inserted_count} inserted, {duplicate_count} duplicates skipped, {errors_count} errors.", "info")
         return redirect(url_for("admin.email_list"))
 
     return render_template("import_emails.html", data={
@@ -387,7 +406,7 @@ def email_exists(email):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+        cursor.execute("SELECT * FROM users WHERE email = %s AND created_by = %s", (email, session["user_id"]))
         user = cursor.fetchone()
         cursor.close()
         conn.close()
