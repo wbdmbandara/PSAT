@@ -7,15 +7,26 @@
         <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
     </div>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
     <form method="POST" action="{{ url_for('admin.create_campaign') }}">
         <div class="row g-4">
             <div class="col-lg-7">
                 <div class="card saas-card p-4 h-100">
                     <h5 class="mb-4">Campaign Configuration</h5>
-                    
+
                     <div class="mb-3">
                         <label for="campaign_name" class="form-label fw-bold">Campaign Name</label>
-                        <input type="text" class="form-control" id="campaign_name" name="campaign_name" placeholder="name" required>
+                        <input type="text" class="form-control" id="campaign_name" name="campaign_name" placeholder="e.g. Q3 Phishing Drill" required>
                     </div>
 
                     <div class="mb-3">
@@ -26,9 +37,11 @@
                     <div class="mb-3">
                         <label for="template_name" class="form-label fw-bold">Select Email Template</label>
                         <select class="form-select" id="template_name" name="template_name" required>
-                            <option value="emails/test_email.html">Standard Test Email</option>
-                            <option value="emails/base_email.html">Base Layout Template</option>
-                            </select>
+                            {% for key, label in data.template_choices %}
+                            <option value="{{ key }}"{% if key == 'corporate' %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Each template sends a matching email and shows a matching login page when clicked.</small>
                     </div>
                 </div>
             </div>
@@ -39,9 +52,9 @@
                         <h5 class="mb-0">Select Targets</h5>
                         <span class="badge bg-primary rounded-pill">{{ data.users|length }} Available</span>
                     </div>
-                    
+
                     <div class="alert alert-info py-2" role="alert">
-                        <small><i class="fa fa-info-circle me-1"></i> Select the users you want to include in this simulation.</small>
+                        <small><i class="fa fa-info-circle me-1"></i> Select the users who will receive this simulation email.</small>
                     </div>
 
                     <div class="target-list border rounded p-3" style="max-height: 250px; overflow-y: auto;">
@@ -57,10 +70,10 @@
                         <p class="text-muted mb-0">No targets found. <a href="{{ url_for('admin.email_list') }}">Add users first</a>.</p>
                         {% endfor %}
                     </div>
-                    
+
                     <div class="mt-4">
                         <button type="submit" class="btn btn-primary w-100 py-2 shadow-sm">
-                            <i class="fa fa-save me-2"></i> Save Campaign as Draft
+                            <i class="fa fa-paper-plane me-2"></i> Launch Campaign &amp; Send Emails
                         </button>
                     </div>
                 </div>

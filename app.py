@@ -3,6 +3,7 @@ from routes.admin_routes import admin_bp
 from routes.track_routes import track_bp
 from config import Config
 from extensions import mail
+from database.db import ensure_schema
 import os
 from datetime import datetime
 
@@ -14,6 +15,9 @@ app.config["SECRET_KEY"] = os.urandom(24)
 
 # 2. Initialize extensions
 mail.init_app(app)
+
+# 3. Ensure database schema is up to date
+ensure_schema()
 
 # 3. Register Blueprints (Cleanly registered once)
 app.register_blueprint(admin_bp, url_prefix="/admin")

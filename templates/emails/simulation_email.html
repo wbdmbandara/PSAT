@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f3f2f1; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f2f1; padding:24px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border:1px solid #e1dfdd;">
+
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding:24px 32px 16px; border-bottom:1px solid #edebe9;">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td>
+                                        <span style="font-size:20px; font-weight:600; color:#0078d4;">{{ org_name }}</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                        <td style="padding:32px;">
+                            <p style="margin:0 0 16px; font-size:14px; color:#323130; line-height:1.6;">
+                                Hello {{ recipient_name }},
+                            </p>
+
+                            <p style="margin:0 0 16px; font-size:14px; color:#323130; line-height:1.6;">
+                                Our records indicate that your corporate account credentials require verification
+                                to maintain uninterrupted access to internal systems and shared resources.
+                            </p>
+
+                            <p style="margin:0 0 24px; font-size:14px; color:#323130; line-height:1.6;">
+                                Please complete the verification process before <strong>{{ deadline }}</strong>
+                                to avoid temporary suspension of your account.
+                            </p>
+
+                            <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                                <tr>
+                                    <td style="background-color:#0078d4; border-radius:2px;">
+                                        <a href="{{ tracking_url }}"
+                                           style="display:inline-block; padding:12px 24px; color:#ffffff; font-size:14px; font-weight:600; text-decoration:none;">
+                                            Verify Account Access
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin:0 0 16px; font-size:13px; color:#605e5c; line-height:1.6;">
+                                If you did not request this verification, please contact the IT Help Desk immediately.
+                            </p>
+
+                            <p style="margin:0; font-size:13px; color:#605e5c; line-height:1.6;">
+                                Thank you,<br>
+                                {{ sender_name }}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding:20px 32px; background-color:#faf9f8; border-top:1px solid #edebe9;">
+                            <p style="margin:0 0 8px; font-size:11px; color:#a19f9d; line-height:1.5;">
+                                This is an automated message from {{ org_name }}. Please do not reply to this email.
+                            </p>
+                            <p style="margin:0; font-size:11px; color:#a19f9d; line-height:1.5;">
+                                &copy; {{ year }} {{ org_name }}. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>
