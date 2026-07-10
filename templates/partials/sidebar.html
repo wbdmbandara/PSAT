@@ -48,17 +48,17 @@
             Total Email Sent
           </a>
 
-          <a href="click-rate.html" class="dropdown-item">
+          <a href="{{ url_for('admin.view_report', report_type='clicks') }}" class="dropdown-item">
             <i class="fa fa-mouse-pointer me-2"></i>
             Overall Click Rate
           </a>
 
-          <a href="login-rate.html" class="dropdown-item">
+          <a href="{{ url_for('admin.view_report', report_type='logins') }}" class="dropdown-item">
             <i class="fa fa-sign-in-alt me-2"></i>
             Login Attempt Rate
           </a>
 
-          <a href="campaigns.html" class="dropdown-item">
+          <a href="{{ url_for('admin.view_report', report_type='campaigns') }}" class="dropdown-item">
             <i class="fa fa-bullhorn me-2"></i>
             Total Campaigns
           </a>
