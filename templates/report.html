@@ -2,7 +2,6 @@
 
 {% block content %}
 <style>
-    /* CSS to format the page cleanly when the Print button is clicked */
     @media print {
         body * { visibility: hidden; }
         #print-section, #print-section * { visibility: visible; }
@@ -10,24 +9,188 @@
         .no-print { display: none !important; }
         .card { border: none !important; box-shadow: none !important; }
     }
+    
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .filter-row {
+        display: flex;
+        gap: 15px;
+        align-items: end;
+        flex-wrap: wrap;
+    }
+    
+    .filter-group {
+        flex: 1;
+        min-width: 200px;
+    }
+    
+    .filter-group label {
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #495057;
+        display: block;
+    }
+    
+    .btn-search {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 8px 25px;
+        font-weight: 600;
+        color: white;
+        cursor: pointer;
+    }
+    
+    .btn-search:hover {
+        background: linear-gradient(135deg, #5a67d8 0%, #6b46a0 100%);
+        color: white;
+    }
+    
+    .btn-reset {
+        background: #6c757d;
+        border: none;
+        padding: 8px 25px;
+        font-weight: 600;
+        color: white;
+        text-decoration: none;
+        display: inline-block;
+        border-radius: 5px;
+    }
+    
+    .btn-reset:hover {
+        background: #5a6268;
+        color: white;
+    }
+    
+    .results-count {
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin-bottom: 15px;
+        padding: 8px 15px;
+        background: #e9ecef;
+        border-radius: 5px;
+        display: inline-block;
+    }
+
+    .form-control {
+        border-radius: 5px;
+        border: 1px solid #ced4da;
+        padding: 8px 12px;
+    }
+
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
 </style>
 
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
         <h3 class="text-dark font-weight-bold">
-            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-outline-secondary me-2 no-print">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-outline-secondary me-2">
                 <i class="fa fa-arrow-left"></i> Back
             </a>
             {{ data.title }}
         </h3>
         
-        <button onclick="window.print()" class="btn btn-primary shadow-sm no-print">
+        <button onclick="window.print()" class="btn btn-primary shadow-sm">
             <i class="fa fa-print me-2"></i> Print Report
         </button>
     </div>
 
+    <!-- Filter Section - Show for ALL reports -->
+    <div class="card saas-card filter-card no-print" id="filter-section">
+        <form method="GET" action="{{ url_for('admin.view_report', report_type=data.report_type) }}" id="filterForm">
+            <div class="filter-row">
+                <!-- Email Textbox -->
+                <div class="filter-group">
+                    <label for="email"><i class="fa fa-envelope me-1"></i>
+                        {% if data.report_type == 'campaigns' %}
+                            Search
+                        {% else %}
+                            Email Address
+                        {% endif %}
+                    </label>
+                    <input type="text" 
+                           class="form-control" 
+                           id="email" 
+                           name="email" 
+                           placeholder="{% if data.report_type == 'campaigns' %}Enter campaign name...{% else %}Enter email to search...{% endif %}"
+                           value="{{ request.args.get('email', '') }}">
+                </div>
+                
+                <!-- Date From -->
+                <div class="filter-group">
+                    <label for="date_from"><i class="fa fa-calendar me-1"></i>Date From</label>
+                    <input type="date" 
+                           class="form-control" 
+                           id="date_from" 
+                           name="date_from"
+                           value="{{ request.args.get('date_from', '') }}">
+                </div>
+                
+                <!-- Date To -->
+                <div class="filter-group">
+                    <label for="date_to"><i class="fa fa-calendar me-1"></i>Date To</label>
+                    <input type="date" 
+                           class="form-control" 
+                           id="date_to" 
+                           name="date_to"
+                           value="{{ request.args.get('date_to', '') }}">
+                </div>
+                
+                <!-- Status Dropdown - ONLY for Emails and Campaigns -->
+                {% if data.report_type == 'emails' or data.report_type == 'campaigns' %}
+                <div class="filter-group">
+                    <label for="status"><i class="fa fa-flag me-1"></i>Status</label>
+                    <select class="form-control" id="status" name="status">
+                        <option value="">All Statuses</option>
+                        <option value="Sent" {{ 'selected' if request.args.get('status') == 'Sent' else '' }}>Sent</option>
+                        <option value="Not Sent" {{ 'selected' if request.args.get('status') == 'Not Sent' else '' }}>Not Sent</option>
+                        {% if data.report_type == 'emails' %}
+                            <option value="Failed" {{ 'selected' if request.args.get('status') == 'Failed' else '' }}>Failed</option>
+                            <option value="Pending" {{ 'selected' if request.args.get('status') == 'Pending' else '' }}>Pending</option>
+                        {% elif data.report_type == 'campaigns' %}
+                            <option value="Draft" {{ 'selected' if request.args.get('status') == 'Draft' else '' }}>Draft</option>
+                            <option value="Active" {{ 'selected' if request.args.get('status') == 'Active' else '' }}>Active</option>
+                            <option value="Completed" {{ 'selected' if request.args.get('status') == 'Completed' else '' }}>Completed</option>
+                        {% endif %}
+                    </select>
+                </div>
+                {% endif %}
+                
+                <!-- Search & Reset Buttons -->
+                <div class="filter-group" style="flex: 0 0 auto;">
+                    <label>&nbsp;</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" class="btn btn-search">
+                            <i class="fa fa-search me-2"></i>Search
+                        </button>
+                        <a href="{{ url_for('admin.view_report', report_type=data.report_type) }}" 
+                           class="btn btn-reset">
+                            <i class="fa fa-refresh me-2"></i>Reset
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Results Section -->
     <div class="card saas-card p-4" id="print-section">
-        <h4 class="mb-4 d-none d-print-block">{{ data.title }}</h4> <div class="table-responsive">
+        <h4 class="mb-3 d-none d-print-block">{{ data.title }}</h4>
+        
+        {% if data.rows %}
+            <div class="results-count">
+                <i class="fa fa-list me-2"></i>Showing <strong>{{ data.rows|length }}</strong> result(s)
+            </div>
+        {% endif %}
+        
+        <div class="table-responsive">
             <table class="table table-hover table-striped align-middle">
                 <thead class="table-dark">
                     <tr>
@@ -42,12 +205,21 @@
                     <tr>
                         <td>{{ loop.index }}</td>
                         {% for cell in row %}
-                            <td>{{ cell }}</td>
+                            <td>
+                                {% if cell is not none %}
+                                    {{ cell }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                         {% endfor %}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">No data available for this report.</td>
+                        <td colspan="{{ data.headers|length + 1 }}" class="text-center text-muted py-4">
+                            <i class="fa fa-inbox fa-2x mb-2 d-block"></i>
+                            No data available for the selected filters.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -55,4 +227,17 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Date validation
+    document.getElementById('filterForm').addEventListener('submit', function(e) {
+        const dateFrom = document.getElementById('date_from').value;
+        const dateTo = document.getElementById('date_to').value;
+        
+        if (dateFrom && dateTo && dateFrom > dateTo) {
+            e.preventDefault();
+            alert('Date From cannot be later than Date To!');
+        }
+    });
+</script>
 {% endblock %}
