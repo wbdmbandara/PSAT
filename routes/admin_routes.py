@@ -181,7 +181,8 @@ def email_list():
         data = {
             "user_name": session["user_name"],
             "current_year": datetime.now().year,
-            "email_list": list_data
+            "email_list": list_data,
+            "template_choices": get_template_choices(),
         }
         return render_template("email_list.html", data=data)
     except Exception as e:
@@ -189,7 +190,8 @@ def email_list():
         data = {
             "user_name": session.get("user_name", ""),
             "current_year": datetime.now().year,
-            "email_list": []
+            "email_list": [],
+            "template_choices": get_template_choices(),
         }
         return render_template("email_list.html", data=data, error=error_msg)
 
@@ -218,7 +220,8 @@ def add_email():
         data = {
             "user_name": session.get("user_name", ""),
             "current_year": datetime.now().year,
-            "email_list": []
+            "email_list": [],
+            "template_choices": get_template_choices(),
         }
         return render_template("email_list.html", data=data, error=error_msg)
 
@@ -296,7 +299,8 @@ def delete_email(email_id):
         return render_template("email_list.html", data={
             "user_name": session.get("user_name", ""),
             "current_year": datetime.now().year,
-            "email_list": []
+            "email_list": [],
+            "template_choices": get_template_choices(),
         }, error=error_msg)
     finally:
         cursor.close()
@@ -364,7 +368,8 @@ def import_emails():
             return render_template("email_list.html", data={
                 "user_name": session.get("user_name", ""),
                 "current_year": datetime.now().year,
-                "email_list": []
+                "email_list": [],
+                "template_choices": get_template_choices(),
             }, error=error_msg)
         finally:
             if cursor:
@@ -383,6 +388,7 @@ def import_emails():
         "user_name": session.get("user_name", ""),
         "current_year": datetime.now().year
     })
+
 
 def email_exists(email):
     try:
@@ -425,6 +431,11 @@ def trigger_simulation(email_id):
     if "user_id" not in session:
         return redirect(url_for("admin.login"))
 
+    template_name = request.form.get("template_name", "").strip()
+    if not template_name or template_name not in TEMPLATE_CONFIG:
+        flash("Please select a valid email template before launching the test.", "danger")
+        return redirect(url_for('admin.email_list'))
+
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -443,17 +454,23 @@ def trigger_simulation(email_id):
 
         cursor.execute(
             "SELECT id FROM campaigns WHERE template_name = %s ORDER BY id DESC LIMIT 1",
-            (DEFAULT_TEMPLATE,)
+            (template_name,)
         )
         campaign = cursor.fetchone()
 
         if campaign:
             campaign_id = campaign[0]
         else:
+            template_label = TEMPLATE_CONFIG[template_name]["label"]
             cursor.execute(
                 """INSERT INTO campaigns (campaign_name, description, status, template_name)
                    VALUES (%s, %s, %s, %s)""",
-                ("Quick Launch", "Single-user simulation from email list", "Active", DEFAULT_TEMPLATE)
+                (
+                    f"Quick Launch – {template_label}",
+                    "Single-user simulation from email list",
+                    "Active",
+                    template_name,
+                )
             )
             conn.commit()
             campaign_id = cursor.lastrowid
@@ -467,7 +484,7 @@ def trigger_simulation(email_id):
         cursor.close()
         conn.close()
 
-        success = send_campaign_email(target_email, email_id, DEFAULT_TEMPLATE, recipient_name=target_name)
+        success = send_campaign_email(target_email, email_id, template_name, recipient_name=target_name)
         
         if success:
             flash(f"Simulation email dispatched to {target_email}.", "success")
