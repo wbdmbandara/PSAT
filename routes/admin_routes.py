@@ -500,6 +500,7 @@ def trigger_simulation(email_id):
 
     return redirect(url_for('admin.email_list'))
 
+# reports
 @admin_bp.route("/report/<report_type>", methods=["GET"])
 def view_report(report_type):
     if "user_id" not in session:
@@ -508,59 +509,147 @@ def view_report(report_type):
     conn = get_connection()
     cursor = conn.cursor()
     
+    # Get filter parameters
+    email_filter = request.args.get('email', '').strip()
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    status_filter = request.args.get('status', '')
+    
     title = ""
     headers = []
     rows = []
+    query_params = []
     
     try:
+        # ============ REPORT 1: EMAILS ============
         if report_type == "emails":
             title = "Email Dispatch Report"
             headers = ["Name", "Email Address", "Sent Time", "Status"]
-            cursor.execute("""
+            
+            base_query = """
                 SELECT u.name, u.email, el.sent_time, el.status 
                 FROM email_logs el 
                 JOIN users u ON el.user_id = u.id 
-                ORDER BY el.sent_time DESC
-            """)
-            rows = cursor.fetchall()
+                WHERE 1=1
+            """
             
+            if email_filter:
+                base_query += " AND (u.email LIKE %s OR u.name LIKE %s)"
+                query_params.extend([f"%{email_filter}%", f"%{email_filter}%"])
+            
+            if date_from:
+                base_query += " AND DATE(el.sent_time) >= %s"
+                query_params.append(date_from)
+            
+            if date_to:
+                base_query += " AND DATE(el.sent_time) <= %s"
+                query_params.append(date_to)
+            
+            if status_filter:
+                if status_filter == "Not Sent":
+                    base_query += " AND (el.status != 'Sent' OR el.status IS NULL)"
+                else:
+                    base_query += " AND el.status = %s"
+                    query_params.append(status_filter)
+            
+            base_query += " ORDER BY el.sent_time DESC"
+        
+        # ============ REPORT 2: CLICKS ============
         elif report_type == "clicks":
             title = "Overall Click Rate Report"
             headers = ["Name", "Email Address", "Click Time", "IP Address"]
-            cursor.execute("""
+            
+            base_query = """
                 SELECT u.name, u.email, cl.click_time, cl.ip_address 
                 FROM click_logs cl 
                 JOIN users u ON cl.user_id = u.id 
-                ORDER BY cl.click_time DESC
-            """)
-            rows = cursor.fetchall()
+                WHERE 1=1
+            """
             
+            if email_filter:
+                base_query += " AND (u.email LIKE %s OR u.name LIKE %s)"
+                query_params.extend([f"%{email_filter}%", f"%{email_filter}%"])
+            
+            if date_from:
+                base_query += " AND DATE(cl.click_time) >= %s"
+                query_params.append(date_from)
+            
+            if date_to:
+                base_query += " AND DATE(cl.click_time) <= %s"
+                query_params.append(date_to)
+            
+            base_query += " ORDER BY cl.click_time DESC"
+        
+        # ============ REPORT 3: LOGINS ============
         elif report_type == "logins":
             title = "Compromise (Login Attempts) Report"
             headers = ["Name", "Email Address", "Attempt Time", "IP Address"]
-            cursor.execute("""
+            
+            base_query = """
                 SELECT u.name, u.email, la.attempt_time, la.ip_address 
                 FROM login_attempts la 
                 JOIN users u ON la.user_id = u.id 
-                ORDER BY la.attempt_time DESC
-            """)
-            rows = cursor.fetchall()      
+                WHERE 1=1
+            """
             
+            if email_filter:
+                base_query += " AND (u.email LIKE %s OR u.name LIKE %s)"
+                query_params.extend([f"%{email_filter}%", f"%{email_filter}%"])
+            
+            if date_from:
+                base_query += " AND DATE(la.attempt_time) >= %s"
+                query_params.append(date_from)
+            
+            if date_to:
+                base_query += " AND DATE(la.attempt_time) <= %s"
+                query_params.append(date_to)
+            
+            base_query += " ORDER BY la.attempt_time DESC"
+        
+        # ============ REPORT 4: CAMPAIGNS ============
         elif report_type == "campaigns":
             title = "Campaign Overview Report"
             headers = ["Campaign ID", "Campaign Name", "Status", "Template Used"]
-            cursor.execute("""
+            
+            base_query = """
                 SELECT id, campaign_name, status, template_name 
                 FROM campaigns 
-                ORDER BY id DESC
-            """)
-            rows = cursor.fetchall()
+                WHERE 1=1
+            """
             
+            if email_filter:
+                base_query += " AND (campaign_name LIKE %s OR template_name LIKE %s)"
+                query_params.extend([f"%{email_filter}%", f"%{email_filter}%"])
+            
+            if date_from:
+                base_query += " AND DATE(created_at) >= %s"
+                query_params.append(date_from)
+            
+            if date_to:
+                base_query += " AND DATE(created_at) <= %s"
+                query_params.append(date_to)
+            
+            if status_filter:
+                if status_filter == "Not Sent":
+                    base_query += " AND status != 'Sent'"
+                else:
+                    base_query += " AND status = %s"
+                    query_params.append(status_filter)
+            
+            base_query += " ORDER BY id DESC"
+        
         else:
+            cursor.close()
+            conn.close()
             return redirect(url_for("admin.dashboard"))
+        
+        # Execute query
+        cursor.execute(base_query, query_params)
+        rows = cursor.fetchall()
             
     except Exception as e:
         print(f"Error fetching report: {e}")
+        rows = []
     finally:
         cursor.close()
         conn.close()
@@ -570,9 +659,11 @@ def view_report(report_type):
         "current_year": datetime.now().year,
         "title": title,
         "headers": headers,
-        "rows": rows
+        "rows": rows,
+        "report_type": report_type
     }
     return render_template("report.html", data=data)
+
 
 @admin_bp.route("/create-campaign", methods=["GET", "POST"])
 def create_campaign():
