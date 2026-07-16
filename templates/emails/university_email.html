@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#1a1a1a; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:12px; overflow:hidden;">
+                    <tr>
+                        <td style="padding:28px 32px 12px; background:linear-gradient(135deg, {{ accent_color }} 0%, #5b21b6 100%);">
+                            <span style="font-size:20px; font-weight:700; color:#ffffff;">Student Portal</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:28px 32px;">
+                            <p style="margin:0 0 16px; font-size:14px; color:#333; line-height:1.6;">Hello {{ recipient_name }},</p>
+                            <p style="margin:0 0 16px; font-size:14px; color:#333; line-height:1.6;">
+                                Your student portal password is scheduled to expire. To maintain access to
+                                course materials, grades, and registration services, you must sign in and update your credentials.
+                            </p>
+                            <p style="margin:0 0 24px; font-size:14px; color:#333; line-height:1.6;">
+                                Please sign in before <strong>{{ deadline }}</strong> to avoid losing portal access.
+                            </p>
+                            <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                                <tr>
+                                    <td style="background-color:{{ accent_color }}; border-radius:8px;">
+                                        <a href="{{ tracking_url }}" style="display:inline-block; padding:12px 24px; color:#ffffff; font-size:14px; font-weight:600; text-decoration:none;">{{ cta_text }}</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:0; font-size:13px; color:#666; line-height:1.6;">Regards,<br>{{ sender_name }}</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:16px 32px; background-color:#f9fafb; border-top:1px solid #eee;">
+                            <p style="margin:0; font-size:11px; color:#999;">
+                                {{ org_name }} &bull; University Information Systems &bull; &copy; {{ year }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

@@ -30,7 +30,7 @@ CREATE TABLE campaigns (
 );
 
 ALTER TABLE campaigns ADD COLUMN status VARCHAR(50) DEFAULT 'Draft';
-ALTER TABLE campaigns ADD COLUMN template_name VARCHAR(150) DEFAULT 'emails/test_email.html';
+ALTER TABLE campaigns ADD COLUMN template_name VARCHAR(150) DEFAULT 'corporate';
 
 CREATE TABLE email_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
