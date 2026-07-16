@@ -28,7 +28,7 @@
             <form action="" method="get">
                 <div class="row g-2 align-items-center">
                     <div class="col-12 col-md-8">
-                        <input type="text" class="form-control" id="search" name="search" placeholder="Search by Email or Name" value="{{ request.args.get('search', '') }}">
+                        <input type="text" class="form-control" id="search" name="search" placeholder="Search by Email or Name" value="{{ data.search_query }}">
                     </div>
         
                     <div class="col-6 col-md-2">
@@ -85,6 +85,14 @@
                     {% endif %}
                 </tbody>
             </table>
+            {% if data.pagination %}
+                <div class="d-flex justify-content-center mt-4">
+                    {{ data.pagination.links }}
+                </div>
+                <div class="text-center text-muted small mt-2">
+                    {{ data.pagination.info }}
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>

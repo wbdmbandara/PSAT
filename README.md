@@ -13,6 +13,7 @@ venv\Scripts\activate
 ### 3. Install dependencies
 pip install -r requirements.txt
 pip install Flask-Mail
+pip install flask-paginate
 
 ### 4. Setup environment variables
 Copy `.env.example` to `.env` and update values.
@@ -21,6 +22,6 @@ Copy `.env.example` to `.env` and update values.
 Run `database/schema.sql` in MySQL.
 
 ### 6. Run Flask application
-python app.py
+flask run
 
 Open: http://127.0.0.1:5000/
