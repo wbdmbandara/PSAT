@@ -1,8 +1,11 @@
 from flask_mail import Message
 from flask import render_template
 from extensions import mail
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+
+from emails.template_config import get_template, DEFAULT_TEMPLATE
+
 
 def send_email(to, subject, template, **kwargs):
     kwargs["year"] = datetime.now().year
@@ -15,42 +18,61 @@ def send_email(to, subject, template, **kwargs):
     mail.send(msg)
 
 
-def send_simulation_email(target_email, user_id):
+def _build_plain_text(cfg, recipient_name, tracking_url, deadline):
+    urgency = cfg["plain_urgency"].format(deadline=deadline)
+    return (
+        f"Hello {recipient_name},\n\n"
+        f"{cfg['plain_intro']}\n\n"
+        f"{urgency}\n\n"
+        f"{cfg['cta_text']}: {tracking_url}\n\n"
+        f"Thank you,\n{cfg['sender_name']}\n\n"
+        f"---\n"
+        f"This is an automated message from {cfg['org_name']}. Please do not reply to this email.\n"
+    )
+
+
+def send_campaign_email(target_email, user_id, template_key=DEFAULT_TEMPLATE, recipient_name="User"):
     """
-    Sends an authorized educational simulation email containing a link back to the local tracker.
+    Sends a template-specific simulation email for authorized awareness testing.
     """
+    cfg = get_template(template_key)
     base_url = os.getenv("BASE_URL", "http://127.0.0.1:5000")
-    
-    # Build the tracking link pointing straight to the target user's database record ID
     tracking_url = f"{base_url}/track/click/{user_id}"
-    
-    subject = "Simulated Security Awareness Test"
-    
-    html_content = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h3 style="color: #d9534f;">Security Verification Required</h3>
-        <p>This is an automated simulation test to evaluate internal security awareness protocols.</p>
-        <p>To confirm your workstation compliance configuration, please review your portal credentials:</p>
-        <p style="margin: 20px 0;">
-            <a href="{tracking_url}" style="background-color: #0275d8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                Verify Account Configuration Here
-            </a>
-        </p>
-        <br>
-        <hr style="border: 0; border-top: 1px solid #ccc;">
-        <p style="font-size: 11px; color: #777;">
-            <strong>Notice:</strong> This message is part of an authorized internal cybersecurity awareness campaign.
-        </p>
-      </body>
-    </html>
-    """
-    
+
+    subject = os.getenv(f"SIMULATION_SUBJECT_{template_key.upper()}", cfg["subject"])
+    deadline = (datetime.now() + timedelta(hours=24)).strftime("%B %d, %Y at %I:%M %p")
+
+    context = {
+        "subject": subject,
+        "recipient_name": recipient_name,
+        "tracking_url": tracking_url,
+        "org_name": cfg["org_name"],
+        "sender_name": cfg["sender_name"],
+        "cta_text": cfg["cta_text"],
+        "accent_color": cfg["accent_color"],
+        "deadline": deadline,
+        "year": datetime.now().year,
+    }
+
+    html_body = render_template(cfg["email_template"], **context)
+    plain_body = _build_plain_text(cfg, recipient_name, tracking_url, deadline)
+    sender = os.getenv("SMTP_SENDER") or os.getenv("SMTP_USER")
+
     try:
-        msg = Message(subject=subject, recipients=[target_email])
-        msg.html = html_content
+        msg = Message(
+            subject=subject,
+            recipients=[target_email],
+            sender=sender,
+            body=plain_body,
+            html=html_body,
+        )
         mail.send(msg)
         return True
     except Exception as e:
-        print(f"Error sending simulation email: {str(e)}")
+        print(f"Error sending campaign email: {str(e)}")
         return False
+
+
+def send_simulation_email(target_email, user_id, recipient_name="User", template_key=DEFAULT_TEMPLATE):
+    """Backward-compatible wrapper used by the quick-launch action on the email list."""
+    return send_campaign_email(target_email, user_id, template_key, recipient_name)

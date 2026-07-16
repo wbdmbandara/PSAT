@@ -5,7 +5,8 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, make_response, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from database.db import get_connection
-from emails.email_service import send_email, send_simulation_email
+from emails.email_service import send_email, send_campaign_email
+from emails.template_config import get_template_choices, DEFAULT_TEMPLATE, TEMPLATE_CONFIG
 from flask_paginate import Pagination, get_page_parameter
 
 # 1. THIS DEFINITION MUST COME BEFORE ANY ROUTES
@@ -242,6 +243,8 @@ def email_list():
             "email_list": list_data,
             "pagination": pagination,
             "search_query": search_query,
+            "email_list": list_data,
+            "template_choices": get_template_choices(),
         }
         return render_template("email_list.html", data=data)
 
@@ -291,7 +294,8 @@ def add_email():
         data = {
             "user_name": session.get("user_name", ""),
             "current_year": datetime.now().year,
-            "email_list": []
+            "email_list": [],
+            "template_choices": get_template_choices(),
         }
         flash(error_msg, "danger")
         return render_template("email_list.html", data=data)
@@ -348,7 +352,7 @@ def edit_email(email_id):
         data = {
             "user_name": session["user_name"],
             "current_year": datetime.now().year,
-            "email_data": email_data
+            "email_data": email_data,
         }
         return render_template("edit_email.html", data=data)
     except Exception as e:
@@ -385,7 +389,17 @@ def delete_email(email_id):
             error_msg = "Cannot delete email because it is linked to other records (e.g., email logs)."
         else:
             error_msg = f"Failed to delete email: {e}"
+
         flash(error_msg, "danger")
+        return render_template(
+            "email_list.html",
+            data={
+                "user_name": session.get("user_name", ""),
+                "current_year": datetime.now().year,
+                "email_list": [],
+                "template_choices": get_template_choices(),
+            },
+        )
     finally:
         cursor.close()
         conn.close()
@@ -454,8 +468,9 @@ def import_emails():
             return render_template("email_list.html", data={
                 "user_name": session.get("user_name", ""),
                 "current_year": datetime.now().year,
-                "email_list": []
-            })
+                "email_list": [],
+                "template_choices": get_template_choices(),
+            }, error=error_msg)
         finally:
             if cursor:
                 cursor.close()
@@ -469,6 +484,7 @@ def import_emails():
         "user_name": session.get("user_name", ""),
         "current_year": datetime.now().year
     })
+
 
 def email_exists(email):
     try:
@@ -511,11 +527,16 @@ def trigger_simulation(email_id):
     if "user_id" not in session:
         return redirect(url_for("admin.login"))
 
+    template_name = request.form.get("template_name", "").strip()
+    if not template_name or template_name not in TEMPLATE_CONFIG:
+        flash("Please select a valid email template before launching the test.", "danger")
+        return redirect(url_for('admin.email_list'))
+
     conn = get_connection()
     try:
         cursor = conn.cursor()
         
-        cursor.execute("SELECT email FROM users WHERE id = %s", (email_id,))
+        cursor.execute("SELECT email, name FROM users WHERE id = %s", (email_id,))
         target = cursor.fetchone()
         
         if not target:
@@ -525,16 +546,27 @@ def trigger_simulation(email_id):
             return redirect(url_for('admin.email_list'))
             
         target_email = target[0]
+        target_name = target[1] or "User"
 
-        cursor.execute("SELECT id FROM campaigns LIMIT 1")
+        cursor.execute(
+            "SELECT id FROM campaigns WHERE template_name = %s ORDER BY id DESC LIMIT 1",
+            (template_name,)
+        )
         campaign = cursor.fetchone()
-        
+
         if campaign:
             campaign_id = campaign[0]
         else:
+            template_label = TEMPLATE_CONFIG[template_name]["label"]
             cursor.execute(
-                "INSERT INTO campaigns (campaign_name, description) VALUES (%s, %s)",
-                ("Default Awareness Campaign", "Automated tracking campaign for baseline testing")
+                """INSERT INTO campaigns (campaign_name, description, status, template_name)
+                   VALUES (%s, %s, %s, %s)""",
+                (
+                    f"Quick Launch – {template_label}",
+                    "Single-user simulation from email list",
+                    "Active",
+                    template_name,
+                )
             )
             conn.commit()
             campaign_id = cursor.lastrowid
@@ -548,10 +580,10 @@ def trigger_simulation(email_id):
         cursor.close()
         conn.close()
 
-        success = send_simulation_email(target_email, email_id)
+        success = send_campaign_email(target_email, email_id, template_name, recipient_name=target_name)
         
         if success:
-            flash(f"Simulation template safely dispatched to {target_email}!", "success")
+            flash(f"Simulation email dispatched to {target_email}.", "success")
         else:
             flash("Database log recorded, but SMTP server failed to deliver email.", "warning")
 
@@ -673,33 +705,41 @@ def view_report(report_type):
         elif report_type == "campaigns":
             title = "Campaign Overview Report"
             headers = ["Campaign ID", "Campaign Name", "Status", "Template Used"]
-            
+
+            query_params = []
             base_query = """
-                SELECT id, campaign_name, status, template_name 
-                FROM campaigns 
+                SELECT id, campaign_name, status, template_name
+                FROM campaigns
                 WHERE 1=1
             """
-            
+
             if email_filter:
                 base_query += " AND (campaign_name LIKE %s OR template_name LIKE %s)"
                 query_params.extend([f"%{email_filter}%", f"%{email_filter}%"])
-            
+
             if date_from:
                 base_query += " AND DATE(created_at) >= %s"
                 query_params.append(date_from)
-            
+
             if date_to:
                 base_query += " AND DATE(created_at) <= %s"
                 query_params.append(date_to)
-            
+
             if status_filter:
                 if status_filter == "Not Sent":
                     base_query += " AND status != 'Sent'"
                 else:
                     base_query += " AND status = %s"
                     query_params.append(status_filter)
-            
+
             base_query += " ORDER BY id DESC"
+
+            cursor.execute(base_query, query_params)
+            raw_rows = cursor.fetchall()
+            rows = [
+                (r[0], r[1], r[2], TEMPLATE_CONFIG.get(r[3], {}).get("label", r[3] or "—"))
+                for r in raw_rows
+            ]
         
         else:
             cursor.close()
@@ -740,30 +780,63 @@ def create_campaign():
         name = request.form.get("campaign_name")
         desc = request.form.get("description")
         template = request.form.get("template_name")
-        target_ids = request.form.getlist("target_users") # Gets list of checked user IDs
+        target_ids = request.form.getlist("target_users")
 
-        try:
-            # 1. Create the campaign
-            cursor.execute(
-                "INSERT INTO campaigns (campaign_name, description, status, template_name) VALUES (%s, %s, %s, %s)",
-                (name, desc, 'Draft', template)
-            )
-            campaign_id = cursor.lastrowid
-
-            # 2. Link targets by creating 'Pending' email logs
-            for uid in target_ids:
+        if not target_ids:
+            flash("Select at least one target user.", "warning")
+        else:
+            try:
                 cursor.execute(
-                    "INSERT INTO email_logs (campaign_id, user_id, status) VALUES (%s, %s, 'Pending')",
-                    (campaign_id, uid)
+                    "INSERT INTO campaigns (campaign_name, description, status, template_name) VALUES (%s, %s, %s, %s)",
+                    (name, desc, 'Active', template)
                 )
-            
-            conn.commit()
-            # Note: For now we redirect to dashboard. Later this will go to a 'Campaign List' page.
-            return redirect(url_for("admin.dashboard")) 
-        except Exception as e:
-            conn.rollback()
-            print(f"Error creating campaign: {e}")
-            # Fall through to re-render the form with an error (you can add flash messages later)
+                campaign_id = cursor.lastrowid
+
+                sent_count = 0
+                failed_count = 0
+
+                for uid in target_ids:
+                    cursor.execute(
+                        "SELECT email, name FROM users WHERE id = %s AND created_by = %s",
+                        (uid, session["user_id"])
+                    )
+                    user_row = cursor.fetchone()
+                    if not user_row:
+                        failed_count += 1
+                        continue
+
+                    target_email, target_name = user_row[0], user_row[1] or "User"
+                    success = send_campaign_email(
+                        target_email, int(uid), template, recipient_name=target_name
+                    )
+
+                    status = 'Sent' if success else 'Failed'
+                    if success:
+                        sent_count += 1
+                    else:
+                        failed_count += 1
+
+                    cursor.execute(
+                        """INSERT INTO email_logs (campaign_id, user_id, sent_time, status)
+                           VALUES (%s, %s, NOW(), %s)""",
+                        (campaign_id, uid, status)
+                    )
+
+                conn.commit()
+
+                if failed_count == 0:
+                    flash(f"Campaign launched. {sent_count} email(s) sent successfully.", "success")
+                else:
+                    flash(
+                        f"Campaign created. {sent_count} sent, {failed_count} failed.",
+                        "warning"
+                    )
+                return redirect(url_for("admin.dashboard"))
+
+            except Exception as e:
+                conn.rollback()
+                print(f"Error creating campaign: {e}")
+                flash("Failed to launch campaign. Please try again.", "danger")
         
     # GET request: Fetch users for the target checklist
     try:
@@ -779,7 +852,8 @@ def create_campaign():
     data = {
         "user_name": session.get("user_name", "Admin"),
         "current_year": datetime.now().year,
-        "users": users_list
+        "users": users_list,
+        "template_choices": get_template_choices(),
     }
     return render_template("create_campaign.html", data=data)
 

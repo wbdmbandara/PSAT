@@ -61,11 +61,11 @@
                                 <td>{{ email[3] }}</td>
                                 <td class="text-center">
                                     <div class="d-flex flex-wrap justify-content-center gap-2">
-                                        <form action="{{ url_for('admin.trigger_simulation', email_id=email[0]) }}" method="POST">
-                                            <button type="submit" class="btn btn-sm btn-danger">
-                                                <i class="bi bi-send-fill"></i> Launch Test
-                                            </button>
-                                        </form>
+                                        <button type="button" class="btn btn-sm btn-danger me-1"
+                                                data-bs-toggle="modal" data-bs-target="#launchTestModal"
+                                                onclick="setLaunchTest('{{ email[0] }}', '{{ email[1] }}', '{{ email[2] }}')">
+                                            <i class="bi bi-send-fill"></i> Launch Test
+                                        </button>
         
                                         <a href="#" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editEmailModal" onclick="setEmailData('{{ email[0] }}', '{{ email[1] }}', '{{ email[2] }}')">
                                             <i class="bi bi-pencil"></i> Edit
@@ -107,7 +107,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="email" class="form-label">Email address</label>
-                        <input type="type" class="form-control" id="email" name="email" required>
+                        <input type="email" class="form-control" id="email" name="email" required>
                     </div>
                     <div class="mb-3">
                         <label for="name" class="form-label">Name</label>
@@ -193,6 +193,38 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="launchTestModal" tabindex="-1" aria-labelledby="launchTestModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="launchTestModalLabel">Launch Test Email</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" id="launchTestForm" action="#">
+                <div class="modal-body">
+                    <p class="mb-3">Send a simulation email to:</p>
+                    <p class="mb-3"><strong id="launchTestRecipient"></strong></p>
+                    <div class="mb-3">
+                        <label for="launchTestTemplate" class="form-label fw-bold">Select Email Template</label>
+                        <select class="form-select" id="launchTestTemplate" name="template_name" required>
+                            <option value="" selected disabled>Choose a template...</option>
+                            {% for key, label in data.template_choices %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Select a template to enable Launch Test.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger" id="launchTestSubmit" disabled>
+                        <i class="bi bi-send-fill"></i> Launch Test
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 <script>
     function setEmailData(emailId, email, name) {
         document.getElementById('editEmail').value = email;
@@ -208,10 +240,25 @@
         document.getElementById('deleteEmailForm').action = url;
     }
 
+    function setLaunchTest(emailId, email, name) {
+        const recipientLabel = name ? `${name} (${email})` : email;
+        document.getElementById('launchTestRecipient').textContent = recipientLabel;
+        const url = "{{ url_for('admin.trigger_simulation', email_id=0) }}".replace('0', parseInt(emailId));
+        document.getElementById('launchTestForm').action = url;
+
+        const templateSelect = document.getElementById('launchTestTemplate');
+        templateSelect.selectedIndex = 0;
+        document.getElementById('launchTestSubmit').disabled = true;
+    }
+
     function downloadSampleCSV() {
         const url = "{{ url_for('admin.download_sample_csv') }}";
         window.location.href = url;
     }
+
+    document.getElementById('launchTestTemplate').addEventListener('change', function () {
+        document.getElementById('launchTestSubmit').disabled = !this.value;
+    });
 </script>
 
 {% endblock %}
