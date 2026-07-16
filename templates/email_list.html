@@ -22,34 +22,37 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
-    {% if error %}
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            {{ error }}
+    
+    <div> 
+
+        <div class="mb-3">
+            <form action="" method="get">
+                <div class="row g-2 align-items-center">
+                    <div class="col-12 col-md-8">
+                        <input type="text" class="form-control" id="search" name="search" placeholder="Search by Email or Name" value="{{ request.args.get('search', '') }}">
+                    </div>
+        
+                    <div class="col-6 col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">Search</button>
+                    </div>
+        
+                    <div class="col-6 col-md-2">
+                        <a href="{{ url_for('admin.email_list') }}" class="btn btn-secondary w-100">Clear</a>
+                    </div>
+                </div>
+            </form>
         </div>
-    {% endif %}
-    {% if success %}
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            {{ success }}
-        </div>
-    {% endif %}
-    {% if session.get("import_summary") %}
-        <div class="alert alert-info alert-dismissible fade show" role="alert">
-            <strong>Imported Email Summary:</strong>
-                Inserted: {{ session["import_summary"].inserted }} ,
-                Duplicates: {{ session["import_summary"].duplicates }} ,
-                Errors: {{ session["import_summary"].errors }}
-        </div>
-    {% endif %}
-    <div class="table-responsive">
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Created At</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
+    
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Created At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
             <tbody>
                 {% if data.email_list %}
                     {% for email in data.email_list %}
@@ -69,12 +72,48 @@
                         </tr>
                     {% endfor %}
                 {% else %}
+
                     <tr>
-                        <td colspan="4" class="text-center">No emails found.</td>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Created At</th>
+                        <th class="text-center">Actions</th>
                     </tr>
-                {% endif %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% if data.email_list %}
+                        {% for email in data.email_list %}
+                            <tr>
+                                <td>{{ email[1] }}</td>
+                                <td>{{ email[2] }}</td>
+                                <td>{{ email[3] }}</td>
+                                <td class="text-center">
+                                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                                        <form action="{{ url_for('admin.trigger_simulation', email_id=email[0]) }}" method="POST">
+                                            <button type="submit" class="btn btn-sm btn-danger">
+                                                <i class="bi bi-send-fill"></i> Launch Test
+                                            </button>
+                                        </form>
+        
+                                        <a href="#" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editEmailModal" onclick="setEmailData('{{ email[0] }}', '{{ email[1] }}', '{{ email[2] }}')">
+                                            <i class="bi bi-pencil"></i> Edit
+                                        </a>
+        
+                                        <a href="#" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#deleteEmailModal" onclick="setEmailDelete('{{ email[0] }}', '{{ email[1] }}', '{{ email[2] }}')">
+                                            <i class="bi bi-trash"></i> Delete
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center">No emails found.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 <div class="modal fade" id="newEmailModal" tabindex="-1" aria-labelledby="newEmailModalLabel" aria-hidden="true">
