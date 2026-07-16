@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from database.db import get_connection
 from emails.email_service import send_email, send_campaign_email
 from emails.template_config import get_template_choices, DEFAULT_TEMPLATE, TEMPLATE_CONFIG
+from flask_paginate import Pagination, get_page_parameter
 
 # 1. THIS DEFINITION MUST COME BEFORE ANY ROUTES
 admin_bp = Blueprint('admin', __name__)
@@ -171,35 +172,97 @@ def email_list():
     if "user_id" not in session:
         return redirect(url_for("admin.login"))
 
+    conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        search_query = request.args.get("search")
-        if search_query:
-            cursor.execute("SELECT * FROM users WHERE created_by = %s AND (email LIKE %s OR name LIKE %s)", (session["user_id"], f"%{search_query}%", f"%{search_query}%"))
-        else:
-            cursor.execute("SELECT * FROM users WHERE created_by = %s", (session["user_id"],))
 
-        list_data = cursor.fetchall()
-        cursor.close()
-        conn.close()
+        page = request.args.get("page", type=int, default=1)   # fixed explicit page param
+        per_page = 10
+        offset = (page - 1) * per_page
+        search_query = request.args.get("search", "", type=str).strip()
+
+        if search_query:
+            search_pattern = f"%{search_query}%"
+
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM users
+                WHERE created_by = %s
+                  AND (email LIKE %s OR name LIKE %s)
+                """,
+                (session["user_id"], search_pattern, search_pattern),
+            )
+            total_records = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                SELECT *
+                FROM users
+                WHERE created_by = %s
+                  AND (email LIKE %s OR name LIKE %s)
+                ORDER BY id DESC
+                LIMIT %s OFFSET %s
+                """,
+                (session["user_id"], search_pattern, search_pattern, per_page, offset),
+            )
+            list_data = cursor.fetchall()
+        else:
+            cursor.execute(
+                "SELECT COUNT(*) FROM users WHERE created_by = %s",
+                (session["user_id"],),
+            )
+            total_records = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                SELECT *
+                FROM users
+                WHERE created_by = %s
+                ORDER BY id DESC
+                LIMIT %s OFFSET %s
+                """,
+                (session["user_id"], per_page, offset),
+            )
+            list_data = cursor.fetchall()
+
+        pagination = Pagination(
+            page=page,
+            total=total_records,
+            per_page=per_page,
+            css_framework="bootstrap5",
+            show_single_page=True,
+            record_name="users",
+        )
+
         data = {
             "user_name": session["user_name"],
             "current_year": datetime.now().year,
             "email_list": list_data,
+            "pagination": pagination,
+            "search_query": search_query,
+            "email_list": list_data,
             "template_choices": get_template_choices(),
         }
         return render_template("email_list.html", data=data)
+
     except Exception as e:
-        error_msg = f"Failed to fetch email list: {e}"
+        flash(f"Failed to fetch email list: {e}", "danger")
         data = {
             "user_name": session.get("user_name", ""),
             "current_year": datetime.now().year,
             "email_list": [],
-            "template_choices": get_template_choices(),
+            "pagination": None,
+            "search_query": request.args.get("search", "")
         }
-        flash(error_msg, "danger")
         return render_template("email_list.html", data=data)
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 @admin_bp.route("/add-email", methods=["POST"])
 def add_email():
@@ -289,7 +352,7 @@ def edit_email(email_id):
         data = {
             "user_name": session["user_name"],
             "current_year": datetime.now().year,
-            "email_data": email_data
+            "email_data": email_data,
         }
         return render_template("edit_email.html", data=data)
     except Exception as e:
