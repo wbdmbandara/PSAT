@@ -34,4 +34,7 @@ def page_not_found(e):
     return render_template("404.html", data=data), 404
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Use Railway's PORT variable, or default to 5000 for local testing
+    port = int(os.environ.get("PORT", 5000))
+    # Bind to 0.0.0.0 to allow external connections
+    app.run(host="0.0.0.0", port=port)
