@@ -14,7 +14,7 @@ SCHEMA_MIGRATIONS = [
 def get_connection():
     return mysql.connector.connect(
         host=os.getenv("DB_HOST"),
-        port=int(os.getenv("DB_PORT")),
+        port=int(os.getenv("DB_PORT", "4000")),
         user=os.getenv("DB_USER"),
 
         password=os.getenv("DB_PASSWORD"),

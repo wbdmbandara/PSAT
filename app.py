@@ -17,7 +17,10 @@ app.config["SECRET_KEY"] = os.urandom(24)
 mail.init_app(app)
 
 # 3. Ensure database schema is up to date
-ensure_schema()
+try:
+    ensure_schema()
+except Exception as e:
+    print("Database initialization failed:", e)
 
 # 3. Register Blueprints (Cleanly registered once)
 app.register_blueprint(admin_bp, url_prefix="/admin")
@@ -27,6 +30,10 @@ app.register_blueprint(track_bp)
 def home():
     return render_template("home.html", current_year=datetime.now().year)
 
+@app.route("/health")
+def health():
+    return "OK", 200
+    
 # 4. Global Error Handlers
 @app.errorhandler(404)
 def page_not_found(e):
