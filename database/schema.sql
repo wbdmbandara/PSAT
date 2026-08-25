@@ -66,3 +66,5 @@ CREATE TABLE login_attempts (
     FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+ALTER TABLE admins ADD COLUMN remember_token_expires DATETIME NULL AFTER remember_token;

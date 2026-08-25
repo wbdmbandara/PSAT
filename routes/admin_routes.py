@@ -1,5 +1,6 @@
 import uuid
 import csv
+import secrets
 from io import StringIO
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, make_response, session, flash
@@ -636,7 +637,7 @@ def trigger_simulation(email_id):
             template_label = TEMPLATE_CONFIG[template_name]["label"]
             cursor.execute(
                 """INSERT INTO campaigns (campaign_name, description, user_id, status, template_name)
-                   VALUES (%s, %s, %s, %s)""",
+                   VALUES (%s, %s, %s, %s, %s)""",
                 (
                     f"Quick Launch – {template_label}",
                     "Single-user simulation from email list",
@@ -864,8 +865,8 @@ def create_campaign():
         else:
             try:
                 cursor.execute(
-                    "INSERT INTO campaigns (campaign_name, description, status, template_name) VALUES (%s, %s, %s, %s)",
-                    (name, desc, 'Active', template)
+                    "INSERT INTO campaigns (campaign_name, description, user_id, status, template_name) VALUES (%s, %s, %s, %s, %s)",
+                    (name, desc, session["user_id"], 'Active', template)
                 )
                 campaign_id = cursor.lastrowid
 
@@ -934,3 +935,111 @@ def create_campaign():
     }
     return render_template("create_campaign.html", data=data)
 
+# forgot password route
+@admin_bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email")
+        if not email:
+            flash("Please provide your email address.", "warning")
+            return render_template("forgot_password.html")
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT id, name FROM admins WHERE email = %s", (email,))
+            user_row = cursor.fetchone()
+            if not user_row:
+                flash("No user found with that email address.", "warning")
+                return render_template("forgot_password.html")
+
+            user_id = user_row[0]
+            user_name = user_row[1]
+            # Generate a unique token for password reset
+            token = secrets.token_urlsafe(32)
+            cursor.execute(
+                "UPDATE admins SET remember_token = %s, remember_token_expires = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = %s",
+                (token, user_id)
+            )
+            conn.commit()
+
+            # Send the reset link to the user's email
+            reset_link = url_for("admin.reset_password", token=token, _external=True)
+            send_reset_email(email, user_name, reset_link)
+
+            flash("A password reset link has been sent to your email.", "success")
+            return redirect(url_for("admin.login"))
+
+        except Exception as e:
+            conn.rollback()
+            print(f"Error in forgot password: {e}")
+            flash("An error occurred. Please try again.", "danger")
+        finally:
+            cursor.close()
+            conn.close()
+
+    return render_template("forgot_password.html")
+
+# send_reset_email
+def send_reset_email(to_email, user_name, reset_link):
+    subject = "Password Reset Request"
+    template = "emails/reset_password.html"
+    send_email(to_email, subject, template, name=user_name, reset_link=reset_link)
+
+# reset_password
+@admin_bp.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT id, name, email FROM admins WHERE remember_token = %s AND remember_token_expires > NOW()",
+            (token,)
+        )
+        user_row = cursor.fetchone()
+        if not user_row:
+            flash("Invalid or expired password reset token.", "danger")
+            return redirect(url_for("admin.login"))
+
+        user_id = user_row[0]
+        user_name = user_row[1]
+        user_email = user_row[2]
+
+        if request.method == "POST":
+            new_password = request.form.get("new_password")
+            confirm_password = request.form.get("confirm_password")
+
+            if not new_password or not confirm_password:
+                flash("Please fill out all fields.", "warning")
+                return render_template("reset_password.html", token=token)
+
+            if new_password != confirm_password:
+                flash("Passwords do not match.", "warning")
+                return render_template("reset_password.html", token=token)
+
+            hashed_password = generate_password_hash(new_password)
+            cursor.execute(
+                "UPDATE admins SET password = %s, remember_token = NULL, remember_token_expires = NULL WHERE id = %s",
+                (hashed_password, user_id)
+            )
+            conn.commit()
+
+            flash("Your password has been reset successfully. Please log in.", "success")
+            send_password_reset_confirmation_email(user_name, user_email)
+            return redirect(url_for("admin.login"))
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error in reset password: {e}")
+        flash("An error occurred. Please try again.", "danger")
+    finally:
+        cursor.close()
+        conn.close()
+
+    return render_template("reset_password.html", token=token)
+
+# send_password_reset_confirmation_email
+def send_password_reset_confirmation_email(user_name, user_email):
+    subject = "Password Reset Confirmation"
+    template = "emails/password_reset_confirmation.html"
+    send_email(user_email, subject, template, name=user_name)
