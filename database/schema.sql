@@ -32,6 +32,9 @@ CREATE TABLE campaigns (
 ALTER TABLE campaigns ADD COLUMN status VARCHAR(50) DEFAULT 'Draft';
 ALTER TABLE campaigns ADD COLUMN template_name VARCHAR(150) DEFAULT 'corporate';
 
+ALTER TABLE campaigns ADD COLUMN `user_id` INT AFTER `description`;
+ALTER TABLE campaigns ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+
 CREATE TABLE email_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     campaign_id INT NOT NULL,

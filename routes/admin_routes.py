@@ -1,7 +1,7 @@
 import uuid
 import csv
 from io import StringIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, make_response, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from database.db import get_connection
@@ -92,75 +92,151 @@ def dashboard():
     if "user_id" not in session:
         return redirect(url_for("admin.login"))
         
+    conn = None
+    cursor = None
+    user_id = session["user_id"]
+
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
         # 1. Total Emails Sent
-        cursor.execute("SELECT COUNT(*) FROM email_logs")
+        cursor.execute("SELECT COUNT(*) FROM email_logs WHERE user_id = %s", (user_id,))
         total_emails = cursor.fetchone()[0] or 0
 
         # 2. Total Clicks
-        cursor.execute("SELECT COUNT(*) FROM click_logs")
+        cursor.execute("SELECT COUNT(*) FROM click_logs WHERE user_id = %s", (user_id,))
         total_clicks = cursor.fetchone()[0] or 0
 
         # 3. Total Compromises (Credential Submissions)
-        cursor.execute("SELECT COUNT(*) FROM login_attempts")
+        cursor.execute("SELECT COUNT(*) FROM login_attempts WHERE user_id = %s", (user_id,))
         total_compromises = cursor.fetchone()[0] or 0
 
         # 4. Active Campaigns
-        cursor.execute("SELECT COUNT(*) FROM campaigns")
+        cursor.execute("SELECT COUNT(*) FROM campaigns WHERE user_id = %s", (user_id,))
         active_campaigns = cursor.fetchone()[0] or 0
 
         # 5. Calculate Rates (Avoid division by zero)
         click_rate = round((total_clicks / total_emails * 100), 1) if total_emails > 0 else 0.0
         compromise_rate = round((total_compromises / total_emails * 100), 1) if total_emails > 0 else 0.0
 
-        # 6. Fetch Recent Activity (Combine tables, sort by most recent)
+        # 6. Fetch Recent Activity
         recent_activity_query = """
-            SELECT 'Simulation Dispatched' as type, sent_time as time, user_id FROM email_logs
+            SELECT 'Simulation Dispatched' as type, sent_time as time, user_id FROM email_logs WHERE user_id = %s
             UNION ALL
-            SELECT 'Link Clicked' as type, click_time as time, user_id FROM click_logs
+            SELECT 'Link Clicked' as type, click_time as time, user_id FROM click_logs WHERE user_id = %s
             UNION ALL
-            SELECT 'Credential Submitted' as type, attempt_time as time, user_id FROM login_attempts
+            SELECT 'Credential Submitted' as type, attempt_time as time, user_id FROM login_attempts WHERE user_id = %s
             ORDER BY time DESC LIMIT 4
         """
-        cursor.execute(recent_activity_query)
-        recent_activities = cursor.fetchall()
+        # FIX: Passed the tuple of parameters matching the three %s placeholders
+        cursor.execute(recent_activity_query, (user_id, user_id, user_id))
+        raw_activities = cursor.fetchall()
         
-        # 7. Basic Chart Data setup (using the current stats as the latest data point)
-        current_month = datetime.now().strftime("%b")
+        recent_activities = []
+        for act_type, act_time, act_user_id in raw_activities:
+            if isinstance(act_time, str):
+                formatted_time = act_time[:16] 
+            elif hasattr(act_time, 'strftime'):
+                formatted_time = act_time.strftime('%Y-%m-%d %H:%M')
+            else:
+                formatted_time = str(act_time)
+                
+            recent_activities.append((act_type, formatted_time, act_user_id))
+        
+        # 7. Chart Data setup (Fixed month/year math)
+        chart_labels = []
+        chart_clicks = []
+        chart_comps = []
+        now = datetime.now()
+        
+        for i in range(5, -1, -1):
+            target_month = now.month - i
+            target_year = now.year
+            
+            # Handle wrapping around to the previous year
+            if target_month <= 0:
+                target_month += 12
+                target_year -= 1
+                
+            # Generate accurate 3-letter month label
+            month_label = datetime(target_year, target_month, 1).strftime("%b")
+            
+            chart_labels.append(month_label)
+            chart_clicks.append(get_click_rate(month=target_month, year=target_year))
+            chart_comps.append(get_compromise_rate(month=target_month, year=target_year))
 
         data = {
             "user_name": session.get("user_name", "Admin"),
-            "current_year": datetime.now().year,
+            "current_year": now.year,
             "total_emails": total_emails,
             "click_rate": click_rate,
             "compromise_rate": compromise_rate,
             "active_campaigns": active_campaigns,
             "recent_activities": recent_activities,
-            # Chart datasets (Dummy historical data + real current data)
-            "chart_labels": ['Jan', 'Feb', 'Mar', 'Apr', 'May', current_month],
-            "chart_clicks": [0, 0, 0, 0, 0, click_rate], 
-            "chart_comps": [0, 0, 0, 0, 0, compromise_rate]
+            "chart_labels": chart_labels,
+            "chart_clicks": chart_clicks,
+            "chart_comps": chart_comps
         }
-
-        cursor.close()
-        conn.close()
 
     except Exception as e:
         print(f"Dashboard Database Error: {e}")
-        # Fallback empty data to prevent the app from crashing if DB fails
+        
+        # Safer fallback month generation
+        now = datetime.now()
+        chart_labels = []
+        for i in range(5, -1, -1):
+            tm = now.month - i
+            if tm <= 0: tm += 12
+            chart_labels.append(datetime(2000, tm, 1).strftime("%b"))
+
         data = {
             "user_name": session.get("user_name", "Admin"),
-            "current_year": datetime.now().year,
+            "current_year": now.year,
             "total_emails": 0, "click_rate": 0.0, "compromise_rate": 0.0, "active_campaigns": 0,
             "recent_activities": [],
-            "chart_labels": ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            "chart_labels": chart_labels,
             "chart_clicks": [0,0,0,0,0,0], "chart_comps": [0,0,0,0,0,0]
         }
+        
+    finally:
+        # FIX: Ensure resources are closed even if an exception is raised
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
     return render_template("dashboard.html", data=data)
+
+def get_click_rate(month=None, year=None):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM email_logs WHERE user_id = %s AND MONTH(sent_time) = %s AND YEAR(sent_time) = %s", (session["user_id"], month, year))
+        total_emails = cursor.fetchone()[0] or 0
+        cursor.execute("SELECT COUNT(*) FROM click_logs WHERE user_id = %s AND MONTH(click_time) = %s AND YEAR(click_time) = %s", (session["user_id"], month, year))
+        total_clicks = cursor.fetchone()[0] or 0
+        cursor.close()
+        conn.close()
+        return round((total_clicks / total_emails * 100), 1) if total_emails > 0 else 0.0
+    except Exception as e:
+        print(f"Error calculating click rate: {e}")
+        return 0.0
+
+def get_compromise_rate(month=None, year=None):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM email_logs WHERE user_id = %s AND MONTH(sent_time) = %s AND YEAR(sent_time) = %s", (session["user_id"], month, year))
+        total_emails = cursor.fetchone()[0] or 0
+        cursor.execute("SELECT COUNT(*) FROM login_attempts WHERE user_id = %s AND MONTH(attempt_time) = %s AND YEAR(attempt_time) = %s", (session["user_id"], month, year))
+        total_compromises = cursor.fetchone()[0] or 0
+        cursor.close()
+        conn.close()
+        return round((total_compromises / total_emails * 100), 1) if total_emails > 0 else 0.0
+    except Exception as e:
+        print(f"Error calculating compromise rate: {e}")
+        return 0.0
 
 @admin_bp.route("/logout", methods=["GET"])
 def logout():
@@ -559,11 +635,12 @@ def trigger_simulation(email_id):
         else:
             template_label = TEMPLATE_CONFIG[template_name]["label"]
             cursor.execute(
-                """INSERT INTO campaigns (campaign_name, description, status, template_name)
+                """INSERT INTO campaigns (campaign_name, description, user_id, status, template_name)
                    VALUES (%s, %s, %s, %s)""",
                 (
                     f"Quick Launch – {template_label}",
                     "Single-user simulation from email list",
+                    session["user_id"],
                     "Active",
                     template_name,
                 )
