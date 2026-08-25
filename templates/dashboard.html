@@ -105,7 +105,7 @@
                         
                         <div class="activity-feed-item {{ is_danger }}">
                             <p class="mb-0 fw-bold">{{ activity[0] }}</p>
-                            <small class="text-muted">User ID #{{ activity[2] }} - {{ activity[1].strftime('%Y-%m-%d %H:%M') }}</small>
+                            <small class="text-muted">User ID #{{ activity[2] }} - {{ activity[1] }}</small>
                         </div>
                     {% else %}
                         <p class="text-muted">No recent activity logged.</p>
@@ -118,60 +118,59 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='lib/chart/chart.min.js') }}"></script>
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        var ctx = document.getElementById('performanceChart').getContext('2d');
-        
-        var gradient = ctx.createLinearGradient(0, 0, 0, 400);
-        gradient.addColorStop(0, 'rgba(13, 110, 253, 0.2)');
-        gradient.addColorStop(1, 'rgba(13, 110, 253, 0)');
+	document.addEventListener("DOMContentLoaded", function() {
+	    var ctx = document.getElementById('performanceChart').getContext('2d');
 
-        // Dynamically insert Python data into JavaScript
-        var chartLabels = {{ data.chart_labels | tojson }};
-        var chartClicks = {{ data.chart_clicks | tojson }};
-        var chartComps = {{ data.chart_comps | tojson }};
+	    var gradient = ctx.createLinearGradient(0, 0, 0, 400);
+	    gradient.addColorStop(0, 'rgba(13, 110, 253, 0.2)');
+	    gradient.addColorStop(1, 'rgba(13, 110, 253, 0)');
 
-        var myChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: chartLabels,
-                datasets: [{
-                    label: 'Click Rate (%)',
-                    data: chartClicks,
-                    borderColor: '#0d6efd',
-                    backgroundColor: gradient,
-                    borderWidth: 3,
-                    pointBackgroundColor: '#ffffff',
-                    pointBorderColor: '#0d6efd',
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    fill: true,
-                    tension: 0.4
-                },
-                {
-                    label: 'Compromise Rate (%)',
-                    data: chartComps,
-                    borderColor: '#dc3545',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    pointBackgroundColor: '#dc3545',
-                    pointRadius: 3,
-                    fill: false,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'top' } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)', drawBorder: false } },
-                    x: { grid: { display: false, drawBorder: false } }
-                }
-            }
-        });
-    });
+	    // Added the | safe filter to ensure Quotes aren't escaped into HTML entities
+	    var chartLabels = {{ data.chart_labels | tojson | safe }};
+	    var chartClicks = {{ data.chart_clicks | tojson | safe }};
+	    var chartComps = {{ data.chart_comps | tojson | safe }};
+
+	    var myChart = new Chart(ctx, {
+	        type: 'line',
+	        data: {
+	            labels: chartLabels,
+	            datasets: [{
+	                label: 'Click Rate (%)',
+	                data: chartClicks,
+	                borderColor: '#0d6efd',
+	                backgroundColor: gradient,
+	                borderWidth: 3,
+	                pointBackgroundColor: '#ffffff',
+	                pointBorderColor: '#0d6efd',
+	                pointBorderWidth: 2,
+	                pointRadius: 4,
+	                fill: true,
+	                tension: 0.4
+	            },
+	            {
+	                label: 'Compromise Rate (%)',
+	                data: chartComps,
+	                borderColor: '#dc3545',
+	                backgroundColor: 'transparent',
+	                borderWidth: 2,
+	                borderDash: [5, 5],
+	                pointBackgroundColor: '#dc3545',
+	                pointRadius: 3,
+	                fill: false,
+	                tension: 0.4
+	            }]
+	        },
+	        options: {
+	            responsive: true,
+	            maintainAspectRatio: false,
+	            plugins: { legend: { position: 'top' } },
+	            scales: {
+	                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)', drawBorder: false } },
+	                x: { grid: { display: false, drawBorder: false } }
+	            }
+	        }
+	    });
+	});
 </script>
 {% endblock %}
