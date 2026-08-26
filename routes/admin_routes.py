@@ -101,27 +101,25 @@ def dashboard():
         conn = get_connection()
         cursor = conn.cursor()
 
-        # 1. Total Emails Sent
-        cursor.execute("SELECT COUNT(*) FROM email_logs WHERE user_id = %s", (user_id,))
-        total_emails = cursor.fetchone()[0] or 0
+        cursor.execute("""
+            SELECT 
+                (SELECT COUNT(*) FROM email_logs WHERE user_id = %s),
+                (SELECT COUNT(*) FROM click_logs WHERE user_id = %s),
+                (SELECT COUNT(*) FROM login_attempts WHERE user_id = %s),
+                (SELECT COUNT(*) FROM campaigns WHERE user_id = %s)
+        """, (user_id, user_id, user_id, user_id))
+        
+        row = cursor.fetchone()
+        total_emails = row[0] or 0
+        total_clicks = row[1] or 0
+        total_compromises = row[2] or 0
+        active_campaigns = row[3] or 0
 
-        # 2. Total Clicks
-        cursor.execute("SELECT COUNT(*) FROM click_logs WHERE user_id = %s", (user_id,))
-        total_clicks = cursor.fetchone()[0] or 0
-
-        # 3. Total Compromises (Credential Submissions)
-        cursor.execute("SELECT COUNT(*) FROM login_attempts WHERE user_id = %s", (user_id,))
-        total_compromises = cursor.fetchone()[0] or 0
-
-        # 4. Active Campaigns
-        cursor.execute("SELECT COUNT(*) FROM campaigns WHERE user_id = %s", (user_id,))
-        active_campaigns = cursor.fetchone()[0] or 0
-
-        # 5. Calculate Rates (Avoid division by zero)
+        # Calculate Rates
         click_rate = round((total_clicks / total_emails * 100), 1) if total_emails > 0 else 0.0
         compromise_rate = round((total_compromises / total_emails * 100), 1) if total_emails > 0 else 0.0
 
-        # 6. Fetch Recent Activity
+        # Fetch Recent Activity
         recent_activity_query = """
             SELECT 'Simulation Dispatched' as type, sent_time as time, user_id FROM email_logs WHERE user_id = %s
             UNION ALL
@@ -130,42 +128,69 @@ def dashboard():
             SELECT 'Credential Submitted' as type, attempt_time as time, user_id FROM login_attempts WHERE user_id = %s
             ORDER BY time DESC LIMIT 4
         """
-        # FIX: Passed the tuple of parameters matching the three %s placeholders
         cursor.execute(recent_activity_query, (user_id, user_id, user_id))
         raw_activities = cursor.fetchall()
         
         recent_activities = []
         for act_type, act_time, act_user_id in raw_activities:
-            if isinstance(act_time, str):
-                formatted_time = act_time[:16] 
-            elif hasattr(act_time, 'strftime'):
+            if hasattr(act_time, 'strftime'):
                 formatted_time = act_time.strftime('%Y-%m-%d %H:%M')
+            elif isinstance(act_time, str):
+                formatted_time = act_time[:16] 
             else:
                 formatted_time = str(act_time)
-                
             recent_activities.append((act_type, formatted_time, act_user_id))
         
-        # 7. Chart Data setup (Fixed month/year math)
         chart_labels = []
-        chart_clicks = []
-        chart_comps = []
+        months_lookup = []
         now = datetime.now()
         
         for i in range(5, -1, -1):
             target_month = now.month - i
             target_year = now.year
-            
-            # Handle wrapping around to the previous year
             if target_month <= 0:
                 target_month += 12
                 target_year -= 1
                 
-            # Generate accurate 3-letter month label
-            month_label = datetime(target_year, target_month, 1).strftime("%b")
+            months_lookup.append((target_year, target_month))
+            chart_labels.append(datetime(target_year, target_month, 1).strftime("%b"))
+
+        oldest_year, oldest_month = months_lookup[0]
+        cutoff_date = f"{oldest_year}-{oldest_month:02d}-01 00:00:00"
+
+        cursor.execute("""
+            SELECT EXTRACT(YEAR FROM sent_time), EXTRACT(MONTH FROM sent_time), COUNT(*) 
+            FROM email_logs WHERE user_id = %s AND sent_time >= %s GROUP BY 1, 2
+        """, (user_id, cutoff_date))
+        monthly_emails = {(int(r[0]), int(r[1])): r[2] for r in cursor.fetchall()}
+
+        cursor.execute("""
+            SELECT EXTRACT(YEAR FROM click_time), EXTRACT(MONTH FROM click_time), COUNT(*) 
+            FROM click_logs WHERE user_id = %s AND click_time >= %s GROUP BY 1, 2
+        """, (user_id, cutoff_date))
+        monthly_clicks = {(int(r[0]), int(r[1])): r[2] for r in cursor.fetchall()}
+
+        cursor.execute("""
+            SELECT EXTRACT(YEAR FROM attempt_time), EXTRACT(MONTH FROM attempt_time), COUNT(*) 
+            FROM login_attempts WHERE user_id = %s AND attempt_time >= %s GROUP BY 1, 2
+        """, (user_id, cutoff_date))
+        monthly_comps = {(int(r[0]), int(r[1])): r[2] for r in cursor.fetchall()}
+
+        chart_clicks = []
+        chart_comps = []
+
+        for year, month in months_lookup:
+            key = (year, month)
+            e_count = monthly_emails.get(key, 0)
+            c_count = monthly_clicks.get(key, 0)
+            comp_count = monthly_comps.get(key, 0)
             
-            chart_labels.append(month_label)
-            chart_clicks.append(get_click_rate(month=target_month, year=target_year))
-            chart_comps.append(get_compromise_rate(month=target_month, year=target_year))
+            # Calculate the monthly rates safely
+            c_rate = round((c_count / e_count * 100), 1) if e_count > 0 else 0.0
+            comp_rate = round((comp_count / e_count * 100), 1) if e_count > 0 else 0.0
+            
+            chart_clicks.append(c_rate)
+            chart_comps.append(comp_rate)
 
         data = {
             "user_name": session.get("user_name", "Admin"),
@@ -183,7 +208,7 @@ def dashboard():
     except Exception as e:
         print(f"Dashboard Database Error: {e}")
         
-        # Safer fallback month generation
+        # Fallback values
         now = datetime.now()
         chart_labels = []
         for i in range(5, -1, -1):
@@ -201,7 +226,6 @@ def dashboard():
         }
         
     finally:
-        # FIX: Ensure resources are closed even if an exception is raised
         if cursor:
             cursor.close()
         if conn:
