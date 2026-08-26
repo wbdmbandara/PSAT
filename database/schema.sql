@@ -68,3 +68,5 @@ CREATE TABLE login_attempts (
 );
 
 ALTER TABLE admins ADD COLUMN remember_token_expires DATETIME NULL AFTER remember_token;
+
+ALTER TABLE users DROP INDEX `email`;
