@@ -727,9 +727,11 @@ def view_report(report_type):
                 SELECT u.name, u.email, el.sent_time, el.status 
                 FROM email_logs el 
                 JOIN users u ON el.user_id = u.id 
-                WHERE 1=1
+                LEFT JOIN campaigns c ON el.campaign_id = c.id 
+                WHERE c.user_id = %s
             """
-            
+            query_params.append(session["user_id"])
+
             if email_filter:
                 base_query += " AND (u.email LIKE %s OR u.name LIKE %s)"
                 query_params.extend([f"%{email_filter}%", f"%{email_filter}%"])
@@ -760,8 +762,10 @@ def view_report(report_type):
                 SELECT u.name, u.email, cl.click_time, cl.ip_address 
                 FROM click_logs cl 
                 JOIN users u ON cl.user_id = u.id 
-                WHERE 1=1
+                LEFT JOIN campaigns c ON cl.campaign_id = c.id
+                WHERE c.user_id = %s
             """
+            query_params.append(session["user_id"])
             
             if email_filter:
                 base_query += " AND (u.email LIKE %s OR u.name LIKE %s)"
@@ -786,8 +790,10 @@ def view_report(report_type):
                 SELECT u.name, u.email, la.attempt_time, la.ip_address 
                 FROM login_attempts la 
                 JOIN users u ON la.user_id = u.id 
-                WHERE 1=1
+                LEFT JOIN campaigns c ON la.campaign_id = c.id
+                WHERE c.user_id = %s
             """
+            query_params.append(session["user_id"])
             
             if email_filter:
                 base_query += " AND (u.email LIKE %s OR u.name LIKE %s)"
@@ -812,8 +818,9 @@ def view_report(report_type):
             base_query = """
                 SELECT id, campaign_name, status, template_name
                 FROM campaigns
-                WHERE 1=1
+                WHERE user_id = %s
             """
+            query_params.append(session["user_id"])
 
             if email_filter:
                 base_query += " AND (campaign_name LIKE %s OR template_name LIKE %s)"
