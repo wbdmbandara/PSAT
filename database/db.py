@@ -1,7 +1,12 @@
 import mysql.connector
 import os
+import socket
+import time
 from mysql.connector import pooling
 from dotenv import load_dotenv
+
+socket.setdefaulttimeout(10)
+MAX_CONN_AGE = 240  # seconds — safely under AWS Global Accelerator's 340s cutoff
 
 load_dotenv()
 
@@ -34,15 +39,29 @@ except mysql.connector.Error as err:
     print(f"[DB] Error initializing connection pool: {err}")
     raise
 
+_conn_created_at = {}  # id(conn) -> timestamp, tracks age for proactive recycling
+
 
 def get_connection():
-    """Fetch an active connection from the pool."""
+    """Fetch a validated, non-stale connection from the pool."""
+    conn = connection_pool.get_connection()
+    created = _conn_created_at.get(id(conn), 0)
+
+    if time.time() - created > MAX_CONN_AGE:
+        try:
+            conn.close()
+        except mysql.connector.Error:
+            pass
+        conn = connection_pool.get_connection()
+
     try:
-        return connection_pool.get_connection()
+        conn.ping(reconnect=True, attempts=2, delay=1)
     except mysql.connector.Error as err:
-        print(f"[DB] Failed to get connection from pool: {err}")
+        print(f"[DB] Connection unhealthy and could not be revived: {err}")
         raise
 
+    _conn_created_at[id(conn)] = time.time()
+    return conn
 
 def ensure_schema():
     """Apply missing column migrations for databases created from an older schema."""
