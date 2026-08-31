@@ -11,7 +11,7 @@ app = Flask(__name__)
 
 # 1. Load configuration and set secret key
 app.config.from_object(Config)
-app.config["SECRET_KEY"] = os.urandom(24)
+app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]
 
 # 2. Initialize extensions
 mail.init_app(app)
